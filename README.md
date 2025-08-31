@@ -64,13 +64,21 @@ A real-time chat application built with React, Node.js, Express, Socket.io, and 
 
 ## Deployment
 
-### Frontend (Netlify/Vercel)
+### Netlify (Frontend)
 
 See [client/README.md](client/README.md) for detailed deployment instructions.
 
-### Backend (Render/Vercel)
+### Render (Full-Stack)
 
-See [server/README.md](server/README.md) for detailed deployment instructions.
+1. Connect your GitHub repository to Render.
+2. Use the `render.yaml` file for multi-service deployment:
+   - It defines both the backend (Node.js) and frontend (static site) services
+   - Set environment variables in Render's dashboard for each service
+   - Deploy both services simultaneously
+
+### Vercel (Both)
+
+See [client/README.md](client/README.md) and [server/README.md](server/README.md) for detailed deployment instructions.
 
 ## Technologies Used
 
