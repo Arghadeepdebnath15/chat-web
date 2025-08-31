@@ -19,6 +19,8 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: CORS_ORIGIN
+        sync: false
     healthCheckPath: /
     plan: free
 
