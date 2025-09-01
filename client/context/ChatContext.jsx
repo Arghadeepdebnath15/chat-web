@@ -14,6 +14,22 @@ export const ChatProvider = ({ children })=>{
     const [showRightSidebar, setShowRightSidebar] = useState(false)
     const [typingUsers, setTypingUsers] = useState({}) // { userId: true }
 
+    // Persist selectedUser in localStorage
+    useEffect(() => {
+        const savedSelectedUser = localStorage.getItem('selectedUser');
+        if (savedSelectedUser) {
+            setSelectedUser(JSON.parse(savedSelectedUser));
+        }
+    }, []);
+
+    useEffect(() => {
+        if (selectedUser) {
+            localStorage.setItem('selectedUser', JSON.stringify(selectedUser));
+        } else {
+            localStorage.removeItem('selectedUser');
+        }
+    }, [selectedUser]);
+
     const {socket, axios} = useContext(AuthContext);
 
     // function to get all users for sidebar
