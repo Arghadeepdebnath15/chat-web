@@ -1,4 +1,4 @@
-# QuickChat Full-Stack
+# My Chat Full-Stack
 
 A real-time chat application built with React, Node.js, Express, Socket.io, and MongoDB.
 

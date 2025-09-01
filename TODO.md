@@ -1,0 +1,6 @@
+- [x] Update app title in client/index.html from "QuickChat" to "My Chat"
+- [x] Update main README.md title from "QuickChat Full-Stack" to "My Chat Full-Stack"
+- [x] Update client/README.md title from "QuickChat Client" to "My Chat Client"
+- [x] Update server/README.md title from "QuickChat Server" to "My Chat Server"
+- [x] Update bios in client/src/assets/assets.js from "QuickChat" to "My Chat"
+- [x] Make text input styling more professional (blue focus ring, gray placeholder, transitions)

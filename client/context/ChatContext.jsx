@@ -11,6 +11,7 @@ export const ChatProvider = ({ children })=>{
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null)
     const [unseenMessages, setUnseenMessages] = useState({})
+    const [showRightSidebar, setShowRightSidebar] = useState(false)
 
     const {socket, axios} = useContext(AuthContext);
 
@@ -80,8 +81,19 @@ export const ChatProvider = ({ children })=>{
         return ()=> unsubscribeFromMessages();
     },[socket, selectedUser])
 
+    // Hide right sidebar when selectedUser changes
+    useEffect(()=>{
+        setShowRightSidebar(false);
+    },[selectedUser])
+
+    // Function to toggle right sidebar
+    const toggleRightSidebar = () => {
+        setShowRightSidebar(prev => !prev);
+    }
+
     const value = {
-        messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages
+        messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
+        showRightSidebar, setShowRightSidebar, toggleRightSidebar
     }
 
     return (

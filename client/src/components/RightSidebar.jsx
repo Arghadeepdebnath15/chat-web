@@ -5,7 +5,7 @@ import { AuthContext } from '../../context/AuthContext'
 
 const RightSidebar = () => {
 
-    const {selectedUser, messages} = useContext(ChatContext)
+    const {selectedUser, messages, setShowRightSidebar} = useContext(ChatContext)
     const {logout, onlineUsers} = useContext(AuthContext)
     const [msgImages, setMsgImages] = useState([])
 
@@ -18,6 +18,10 @@ const RightSidebar = () => {
 
   return selectedUser && (
     <div className={`bg-[#8185B2]/10 text-white w-full relative overflow-y-scroll ${selectedUser ? "max-md:hidden" : ""}`}>
+
+        <button onClick={() => setShowRightSidebar(false)} className='absolute top-4 right-4 text-white text-xl hover:text-gray-300 transition-colors'>
+            ×
+        </button>
 
         <div className='pt-16 flex flex-col items-center gap-2 text-xs font-light mx-auto'>
             <img src={selectedUser?.profilePic || assets.avatar_icon} alt=""

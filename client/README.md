@@ -1,6 +1,5 @@
-# QuickChat Client
-
-A React-based chat application frontend built with Vite, Tailwind CSS, and Socket.io for real-time communication.
+# My Chat Client
+ext inputA React-based chat application frontend built with Vite, Tailwind CSS, and Socket.io for real-time communication.
 
 ## Features
 
