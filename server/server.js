@@ -13,7 +13,7 @@ const server = http.createServer(app)
 
 // Initialize socket.io server
 export const io = new Server(server, {
-    cors: {origin: process.env.CORS_ORIGIN || "*"}
+    cors: {origin: process.env.CORS_ORIGIN || "https://michats.netlify.app"}
 })
 
 // Store online users
@@ -39,7 +39,7 @@ io.on("connection", (socket)=>{
 // Middleware setup
 app.use(express.json({limit: "4mb"}));
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: process.env.CORS_ORIGIN || "https://michats.netlify.app",
     credentials: true
 }));
 
