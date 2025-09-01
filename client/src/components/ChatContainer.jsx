@@ -84,7 +84,7 @@ const ChatContainer = () => {
       </div>
 
       {/* ------- bottom area ------- */}
-    <div className='absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/50 to-transparent'>
+    <div className='absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/50 to-transparent transition-all duration-300 ease-in-out'>
         <div className='flex items-center gap-2'>
             <div className='flex-1 flex items-center bg-gradient-to-r from-indigo-800/50 to-purple-800/50 px-4 py-2 rounded-full border-2 border-pink-400 shadow-lg backdrop-blur-sm'>
                 <input onChange={(e)=> {setInput(e.target.value); sendTyping();}} onBlur={stopTyping} value={input} onKeyDown={(e)=> e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder="Send a message..."
