@@ -85,6 +85,20 @@ export const ChatProvider = ({ children })=>{
         });
     }
 
+    // function to send typing event
+    const sendTyping = () => {
+        if(socket && selectedUser) {
+            socket.emit("typing", { to: selectedUser._id });
+        }
+    }
+
+    // function to send stop typing event
+    const stopTyping = () => {
+        if(socket && selectedUser) {
+            socket.emit("stopTyping", { to: selectedUser._id });
+        }
+    }
+
     // function to unsubscribe from messages
     const unsubscribeFromMessages = ()=>{
         if(socket) socket.off("newMessage");
@@ -108,7 +122,7 @@ export const ChatProvider = ({ children })=>{
 
     const value = {
         messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
-        showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers
+        showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping
     }
 
     return (
