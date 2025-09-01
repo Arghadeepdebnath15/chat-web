@@ -65,12 +65,13 @@ const ChatContainer = () => {
         <img src={assets.help_icon} alt="" className='max-md:hidden max-w-5 hover:opacity-70 transition-opacity cursor-pointer'/>
       </div>
       {/* ------- chat area ------- */}
-      <div className='flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6 bg-gradient-to-b from-transparent to-gray-900/20'>
+      <div className='flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6 bg-gradient-to-b from-transparent to-gray-900/20 scroll-smooth touch-auto -webkit-overflow-scrolling-touch'>
         {messages.map((msg, index)=>(
             <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
                 {msg.image ? (
                     <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
                 ):(
+
                     <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
                 )}
                 <div className="text-center text-xs">
