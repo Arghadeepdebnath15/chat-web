@@ -30,7 +30,22 @@ const Sidebar = () => {
                 
             </div>
             <div className="relative py-2 group">
-                <img src={assets.menu_icon} alt="Menu" className='max-h-5 cursor-pointer' />
+                <img 
+                  src={assets.menu_icon} 
+                  alt="Menu" 
+                  className='max-h-5 cursor-pointer' 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const menu = e.currentTarget.nextSibling;
+                    if (menu) {
+                      if (menu.classList.contains('hidden')) {
+                        menu.classList.remove('hidden');
+                      } else {
+                        menu.classList.add('hidden');
+                      }
+                    }
+                  }}
+                />
                 <div className='absolute top-full right-0 z-20 w-32 p-5 rounded-md bg-[#282142] border border-gray-600 text-gray-100 hidden group-hover:block'>
                     <p onClick={()=>navigate('/profile')} className='cursor-pointer text-sm'>Edit Profile</p>
                     <hr className="my-2 border-t border-gray-500" />
