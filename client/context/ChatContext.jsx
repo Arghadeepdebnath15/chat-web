@@ -13,6 +13,7 @@ export const ChatProvider = ({ children })=>{
     const [unseenMessages, setUnseenMessages] = useState({})
     const [showRightSidebar, setShowRightSidebar] = useState(false)
     const [typingUsers, setTypingUsers] = useState({}) // { userId: true }
+    const [loadingMessages, setLoadingMessages] = useState(false);
 
     // Persist selectedUser in localStorage
     useEffect(() => {
@@ -60,12 +61,17 @@ export const ChatProvider = ({ children })=>{
     // function to get messages for selected user
     const getMessages = async (userId)=>{
         try {
+            setLoadingMessages(true);
+            // Clear messages immediately before fetching new ones
+            setMessages([]);
             const { data } = await axios.get(`/api/messages/${userId}`);
             if (data.success){
                 setMessages(data.messages)
             }
         } catch (error) {
             toast.error(error.message)
+        } finally {
+            setLoadingMessages(false);
         }
     }
 
@@ -157,7 +163,7 @@ export const ChatProvider = ({ children })=>{
 
     const value = {
         messages, users, selectedUser, getUsers, searchUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
-        showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping
+        showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages
     }
 
     return (

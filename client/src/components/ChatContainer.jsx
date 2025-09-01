@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 const ChatContainer = () => {
 
     const { messages, selectedUser, setSelectedUser, sendMessage,
-        getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping } = useContext(ChatContext)
+        getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages } = useContext(ChatContext)
 
     const { authUser, onlineUsers } = useContext(AuthContext)
 
@@ -42,6 +42,9 @@ const ChatContainer = () => {
 
     useEffect(()=>{
         if(selectedUser){
+            // Clear messages immediately when switching users to prevent showing old chat content
+            // This will be overridden by the new messages when getMessages completes
+            // Note: We can't directly set messages here since it's from context, so we rely on ChatContext's clearing
             getMessages(selectedUser._id)
         }
     },[selectedUser])
@@ -66,7 +69,15 @@ const ChatContainer = () => {
       </div>
       {/* ------- chat area ------- */}
       <div className='flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6 bg-gradient-to-b from-transparent to-gray-900/20 scroll-smooth touch-auto -webkit-overflow-scrolling-touch'>
-        {messages.map((msg, index)=>(
+        {loadingMessages ? (
+          <div className='flex items-center justify-center h-full'>
+            <div className='text-white text-center'>
+              <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2'></div>
+              <p>Loading messages...</p>
+            </div>
+          </div>
+        ) : (
+          messages.map((msg, index)=>(
             <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
                 {msg.image ? (
                     <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
@@ -79,7 +90,8 @@ const ChatContainer = () => {
                     <p className='text-gray-400 mt-1'>{formatMessageTime(msg.createdAt)}</p>
                 </div>
             </div>
-        ))}
+          ))
+        )}
         <div ref={scrollEnd}></div>
       </div>
 
