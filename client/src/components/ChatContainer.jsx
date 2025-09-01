@@ -93,7 +93,13 @@ const ChatContainer = () => {
                 <img src={assets.gallery_icon} alt="" className="w-5 mr-2 cursor-pointer hover:scale-110 transition-transform filter hue-rotate-180"/>
             </label>
         </div>
-        <img onClick={handleSendMessage} src={assets.send_button} alt="" className="w-7 cursor-pointer hover:scale-110 transition-transform shadow-md" />
+        <img 
+          onClick={handleSendMessage} 
+          src={assets.send_button} 
+          alt="" 
+          className={`cursor-pointer shadow-md transition-transform hover:scale-110 
+            ${input.trim() ? 'w-10 filter saturate-150' : 'w-7 filter saturate-50'}`} 
+        />
     </div>
 
 
