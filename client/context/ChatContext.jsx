@@ -137,6 +137,13 @@ export const ChatProvider = ({ children })=>{
         return ()=> unsubscribeFromMessages();
     },[socket, selectedUser])
 
+    // Clear messages when switching users to prevent showing old chat content
+    useEffect(() => {
+        if (selectedUser) {
+            setMessages([]); // Clear messages immediately when user changes
+        }
+    }, [selectedUser]);
+
     // Hide right sidebar when selectedUser changes
     // Disabled to allow sidebar to stay open on mobile
     // useEffect(()=>{
