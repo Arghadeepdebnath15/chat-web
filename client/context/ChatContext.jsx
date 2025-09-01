@@ -82,9 +82,10 @@ export const ChatProvider = ({ children })=>{
     },[socket, selectedUser])
 
     // Hide right sidebar when selectedUser changes
-    useEffect(()=>{
-        setShowRightSidebar(false);
-    },[selectedUser])
+    // Disabled to allow sidebar to stay open on mobile
+    // useEffect(()=>{
+    //     setShowRightSidebar(false);
+    // },[selectedUser])
 
     // Function to toggle right sidebar
     const toggleRightSidebar = () => {

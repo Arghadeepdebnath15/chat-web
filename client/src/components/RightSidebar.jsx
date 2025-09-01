@@ -17,7 +17,7 @@ const RightSidebar = () => {
     },[messages])
 
   return selectedUser && (
-    <div className={`bg-[#8185B2]/10 text-white w-full relative overflow-y-scroll ${selectedUser ? "max-md:hidden" : ""}`}>
+    <div className={`bg-[#8185B2]/10 text-white w-full relative overflow-y-scroll`}>
 
         <button onClick={() => setShowRightSidebar(false)} className='absolute top-4 right-4 text-white text-xl hover:text-gray-300 transition-colors'>
             ×
