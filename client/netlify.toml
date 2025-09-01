@@ -9,3 +9,4 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_BACKEND_URL = "https://chat-web-1-1jvh.onrender.com"
