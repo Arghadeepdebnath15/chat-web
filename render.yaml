@@ -9,7 +9,7 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: MONGO_URI
+      - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         sync: false
@@ -27,14 +27,12 @@ services:
   - type: web
     name: quickchat-client
     runtime: static
-    buildCommand: npm run build
+    buildCommand: cd client && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: NODE_ENV
         value: production
-      - key: VITE_API_URL
-        sync: false
-      - key: VITE_SOCKET_URL
+      - key: VITE_BACKEND_URL
         sync: false
     routes:
       - type: rewrite
