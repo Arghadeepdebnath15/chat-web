@@ -45,6 +45,18 @@ export const ChatProvider = ({ children })=>{
         }
     }
 
+    // function to search users
+    const searchUsers = async (query) =>{
+        try {
+            const { data } = await axios.get(`/api/messages/search?q=${query}`);
+            if (data.success) {
+                return data.users;
+            }
+        } catch (error) {
+            toast.error(error.message)
+        }
+    }
+
     // function to get messages for selected user
     const getMessages = async (userId)=>{
         try {
@@ -137,7 +149,7 @@ export const ChatProvider = ({ children })=>{
     }
 
     const value = {
-        messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
+        messages, users, selectedUser, getUsers, searchUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
         showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping
     }
 

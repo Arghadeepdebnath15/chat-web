@@ -4,11 +4,18 @@ import cloudinary from "../lib/cloudinary.js"
 import { io, userSocketMap } from "../server.js";
 
 
-// Get all users except the logged in user
+// Get all users with whom the logged in user has chatted
 export const getUsersForSidebar = async (req, res)=>{
     try {
         const userId = req.user._id;
-        const filteredUsers = await User.find({_id: {$ne: userId}}).select("-password");
+
+        // Find all unique user IDs that have sent or received messages with the current user
+        const messageUsers = await Message.distinct("senderId", { receiverId: userId });
+        const messageUsers2 = await Message.distinct("receiverId", { senderId: userId });
+
+        const allUserIds = [...new Set([...messageUsers, ...messageUsers2])];
+
+        const filteredUsers = await User.find({_id: {$in: allUserIds}}).select("-password");
 
         // Count number of messages not seen
         const unseenMessages = {}
@@ -20,6 +27,28 @@ export const getUsersForSidebar = async (req, res)=>{
         })
         await Promise.all(promises);
         res.json({success: true, users: filteredUsers, unseenMessages})
+    } catch (error) {
+        console.log(error.message);
+        res.json({success: false, message: error.message})
+    }
+}
+
+// Search users by name
+export const searchUsers = async (req, res)=>{
+    try {
+        const userId = req.user._id;
+        const { q } = req.query;
+
+        if (!q) {
+            return res.json({success: true, users: []});
+        }
+
+        const searchedUsers = await User.find({
+            _id: {$ne: userId},
+            fullName: {$regex: q, $options: 'i'}
+        }).select("-password");
+
+        res.json({success: true, users: searchedUsers})
     } catch (error) {
         console.log(error.message);
         res.json({success: false, message: error.message})

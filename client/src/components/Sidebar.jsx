@@ -6,20 +6,33 @@ import { ChatContext } from '../../context/ChatContext';
 
 const Sidebar = () => {
 
-    const {getUsers, users, selectedUser, setSelectedUser,
+    const {getUsers, searchUsers, users, selectedUser, setSelectedUser,
         unseenMessages, setUnseenMessages } = useContext(ChatContext);
 
     const {logout, onlineUsers} = useContext(AuthContext)
 
-    const [input, setInput] = useState(false)
+    const [input, setInput] = useState('')
+    const [searchedUsers, setSearchedUsers] = useState([])
 
     const navigate = useNavigate();
 
-    const filteredUsers = input ? users.filter((user)=>user.fullName.toLowerCase().includes(input.toLowerCase())) : users;
+    const displayedUsers = input ? searchedUsers : users;
 
     useEffect(()=>{
         getUsers();
     },[onlineUsers])
+
+    useEffect(() => {
+        const fetchSearchedUsers = async () => {
+            if (input.trim()) {
+                const results = await searchUsers(input.trim());
+                setSearchedUsers(results || []);
+            } else {
+                setSearchedUsers([]);
+            }
+        };
+        fetchSearchedUsers();
+    }, [input, searchUsers]);
 
   return (
     <div className={`bg-black h-full p-5 rounded-r-xl overflow-y-scroll text-white ${selectedUser ? "max-md:hidden" : ''}`}>
@@ -56,13 +69,13 @@ const Sidebar = () => {
 
         <div className='bg-[#282142] rounded-full flex items-center gap-2 py-3 px-4 mt-5'>
             <img src={assets.search_icon} alt="Search" className='w-3'/>
-            <input onChange={(e)=>setInput(e.target.value)} type="text" className='bg-transparent border-none outline-none text-white text-xs placeholder-gray-400 flex-1 focus:ring-2 focus:ring-blue-500 rounded-md transition-all' placeholder='Search User...'/>
+            <input onChange={(e)=>setInput(e.target.value)} type="text" className='bg-transparent border-none outline-none text-white text-xs placeholder-gray-400 flex-1 rounded-md transition-all' placeholder='Search User...'/>
         </div>
 
       </div>
 
     <div className='flex flex-col'>
-        {filteredUsers.map((user, index)=>(
+        {displayedUsers.map((user, index)=>(
             <div onClick={()=> {setSelectedUser(user); setUnseenMessages(prev=> ({...prev, [user._id]:0}))}}
              key={index} className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${selectedUser?._id === user._id && 'bg-[#282142]/50'}`}>
                 <img src={user?.profilePic || assets.avatar_icon} alt="" className='w-[35px] aspect-[1/1] rounded-full'/>
