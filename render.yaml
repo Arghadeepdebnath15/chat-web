@@ -1,4 +1,4 @@
-services:
+nservices:
   - type: web
     name: quickchat-server
     runtime: node

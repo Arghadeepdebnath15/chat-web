@@ -12,6 +12,7 @@ export const ChatProvider = ({ children })=>{
     const [selectedUser, setSelectedUser] = useState(null)
     const [unseenMessages, setUnseenMessages] = useState({})
     const [showRightSidebar, setShowRightSidebar] = useState(false)
+    const [typingUsers, setTypingUsers] = useState({}) // { userId: true }
 
     const {socket, axios} = useContext(AuthContext);
 
@@ -69,6 +70,19 @@ export const ChatProvider = ({ children })=>{
                 }))
             }
         })
+
+        // Typing indicator events
+        socket.on("typing", ({ from }) => {
+            setTypingUsers(prev => ({ ...prev, [from]: true }));
+        });
+
+        socket.on("stopTyping", ({ from }) => {
+            setTypingUsers(prev => {
+                const newTypingUsers = { ...prev };
+                delete newTypingUsers[from];
+                return newTypingUsers;
+            });
+        });
     }
 
     // function to unsubscribe from messages
@@ -94,7 +108,7 @@ export const ChatProvider = ({ children })=>{
 
     const value = {
         messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
-        showRightSidebar, setShowRightSidebar, toggleRightSidebar
+        showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers
     }
 
     return (
