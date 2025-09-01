@@ -7,7 +7,16 @@ import {Toaster} from "react-hot-toast"
 import { AuthContext } from '../context/AuthContext'
 
 const App = () => {
-  const { authUser } = useContext(AuthContext)
+  const { authUser, loading } = useContext(AuthContext)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen text-white text-xl">
+        Loading...
+      </div>
+    )
+  }
+
   return (
     <div className="bg-[url('/bgImage.svg')] bg-contain">
       <Toaster/>

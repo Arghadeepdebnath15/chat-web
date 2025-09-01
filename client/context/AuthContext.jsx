@@ -15,6 +15,7 @@ export const AuthProvider = ({ children })=>{
     const [authUser, setAuthUser] = useState(null);
     const [onlineUsers, setOnlineUsers] = useState([]);
     const [socket, setSocket] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     // Check if user is authenticated and if so, set the user data and connect the socket
     const checkAuth = async () => {
@@ -23,33 +24,38 @@ export const AuthProvider = ({ children })=>{
             if (data.success) {
                 setAuthUser(data.user)
                 connectSocket(data.user)
+            } else {
+                setAuthUser(null);
+            }
+        } catch (error) {
+            toast.error(error.message)
+            setAuthUser(null);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Login function to handle user authentication and socket connection
+
+    const login = async (state, credentials)=>{
+        try {
+            const { data } = await axios.post(`/api/auth/${state}`, credentials);
+            if (data.success){
+                setAuthUser(data.userData);
+                connectSocket(data.userData);
+                axios.defaults.headers.common["token"] = data.token;
+                setToken(data.token);
+                localStorage.setItem("token", data.token)
+                toast.success(data.message)
+            }else{
+                toast.error(data.message)
             }
         } catch (error) {
             toast.error(error.message)
         }
     }
 
-// Login function to handle user authentication and socket connection
-
-const login = async (state, credentials)=>{
-    try {
-        const { data } = await axios.post(`/api/auth/${state}`, credentials);
-        if (data.success){
-            setAuthUser(data.userData);
-            connectSocket(data.userData);
-            axios.defaults.headers.common["token"] = data.token;
-            setToken(data.token);
-            localStorage.setItem("token", data.token)
-            toast.success(data.message)
-        }else{
-            toast.error(data.message)
-        }
-    } catch (error) {
-        toast.error(error.message)
-    }
-}
-
-// Logout function to handle user logout and socket disconnection
+    // Logout function to handle user logout and socket disconnection
 
     const logout = async () =>{
         localStorage.removeItem("token");
@@ -105,7 +111,8 @@ const login = async (state, credentials)=>{
         socket,
         login,
         logout,
-        updateProfile
+        updateProfile,
+        loading
     }
 
     return (
