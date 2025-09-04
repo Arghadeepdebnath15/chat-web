@@ -11,6 +11,7 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
   const [callingState, setCallingState] = useState(isIncoming ? 'incoming' : 'calling');
   const [pendingOffer, setPendingOffer] = useState(null);
   const [hasAccepted, setHasAccepted] = useState(false);
+  const [popupShown, setPopupShown] = useState(false);
 
   const configuration = {
     iceServers: [
@@ -89,10 +90,11 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
     // Listen for offer
     socket.on("webrtc-offer", async ({ from, offer }) => {
       console.log("Received webrtc-offer from", from, offer);
-      if (!hasAccepted) {
+      if (!hasAccepted && !popupShown) {
         setPendingOffer(offer);
         setCallingState('incoming');
         setShowAcceptPopup(true);
+        setPopupShown(true);
       }
     });
 
@@ -110,9 +112,10 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
     // Listen for call invitation
     socket.on("webrtc-call-invitation", ({ from }) => {
       console.log("Received webrtc-call-invitation from", from);
-      if (!hasAccepted) {
+      if (!hasAccepted && !popupShown) {
         setCallingState('incoming');
         setShowAcceptPopup(true);
+        setPopupShown(true);
       }
     });
 
