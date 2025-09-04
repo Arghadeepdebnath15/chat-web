@@ -4,7 +4,7 @@ import { formatMessageTime } from '../lib/utils'
 import { ChatContext } from '../../context/ChatContext'
 import { AuthContext } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
-import VideoCall from './VideoCall'
+import VideoCallNew from './VideoCallNew'
 
 const ChatContainer = () => {
 
@@ -195,7 +195,7 @@ const ChatContainer = () => {
     </div>
 
     {showVideoCall && (
-        <VideoCall
+        <VideoCallNew
             onClose={handleVideoCallClose}
             isIncoming={!!incomingCallDetails}
             caller={incomingCallDetails?.from}
