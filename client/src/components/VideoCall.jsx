@@ -14,6 +14,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [pendingOffer, setPendingOffer] = useState(null);
 
+  // Debug pendingOffer changes
+  useEffect(() => {
+    console.log("pendingOffer state changed:", pendingOffer);
+  }, [pendingOffer]);
+
   // WebRTC Configuration with STUN/TURN servers
   const rtcConfiguration = {
     iceServers: [
@@ -164,9 +169,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
     try {
       console.log("Setting remote description from pending offer...");
-      console.log("Pending offer:", pendingOffer);
+      console.log("Current pending offer:", pendingOffer);
+
+      // Use a callback to ensure we get the latest state
+      let currentOffer = null;
+      setPendingOffer(current => {
+        currentOffer = current;
+        console.log("Retrieved pending offer in callback:", current);
+        return current;
+      });
+
+      // Wait for state update
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      if (!currentOffer) {
+        console.error("No pending offer available!");
+        setCallState('failed');
+        onClose();
+        return;
+      }
+
       // Set remote description from pending offer
-      await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+      await pc.setRemoteDescription(new RTCSessionDescription(currentOffer));
       console.log("Remote description set successfully");
 
       console.log("Creating answer...");
@@ -276,11 +300,18 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     const handleOffer = ({ from, offer }) => {
       console.log("=== RECEIVED WEBRTC OFFER ===");
       console.log("Received offer from:", from);
-      console.log("Offer:", offer);
-      setPendingOffer(offer);
-      setCallState('incoming');
-      setShowAcceptPopup(true);
-      console.log("Set showAcceptPopup to true, callState to incoming");
+      console.log("Offer type:", offer?.type);
+      console.log("Offer sdp length:", offer?.sdp?.length);
+
+      if (offer && offer.type && offer.sdp) {
+        // Use functional update to ensure latest state
+        setPendingOffer(() => offer);
+        setCallState('incoming');
+        setShowAcceptPopup(true);
+        console.log("Offer stored successfully, popup should show");
+      } else {
+        console.error("Invalid offer received:", offer);
+      }
     };
 
     // Handle WebRTC answer
