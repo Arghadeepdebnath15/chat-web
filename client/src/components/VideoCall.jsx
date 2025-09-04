@@ -17,20 +17,34 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [localVideoLoading, setLocalVideoLoading] = useState(true);
   const [remoteVideoLoading, setRemoteVideoLoading] = useState(true);
   const [connectionDiagnostics, setConnectionDiagnostics] = useState(null);
+  const [connectionQuality, setConnectionQuality] = useState('unknown');
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
-  // WebRTC Configuration with multiple servers for better connectivity
+  // WebRTC Configuration with reliable TURN servers
   const rtcConfiguration = {
     iceServers: [
+      // Primary STUN servers
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
       { urls: "stun:stun2.l.google.com:19302" },
       { urls: "stun:stun3.l.google.com:19302" },
       { urls: "stun:stun4.l.google.com:19302" },
+
+      // Reliable TURN servers (updated with working credentials)
       {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject"
+        urls: [
+          "turn:turn.bistri.com:80",
+          "turn:turn.anyfirewall.com:443"
+        ],
+        username: "webrtc",
+        credential: "webrtc"
       },
+      {
+        urls: "turn:numb.viagenie.ca",
+        credential: "muazkh",
+        username: "webrtc@live.com"
+      },
+      // Fallback TURN server
       {
         urls: "turn:openrelay.metered.ca:80",
         username: "openrelayproject",
@@ -38,6 +52,9 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       }
     ],
     iceCandidatePoolSize: 10,
+    // Additional configuration for better connectivity
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
   };
 
   // Initialize WebRTC peer connection with enhanced configuration
@@ -82,30 +99,48 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       }
     };
 
-    // Handle ICE connection state changes
+    // Handle ICE connection state changes with retry logic
     peerConnectionRef.current.oniceconnectionstatechange = () => {
       console.log("ICE connection state:", peerConnectionRef.current.iceConnectionState);
       if (peerConnectionRef.current.iceConnectionState === 'connected') {
         console.log("ICE connection established");
+        setCallState('connected');
       } else if (peerConnectionRef.current.iceConnectionState === 'failed') {
-        console.error("ICE connection failed");
-        setCallState('failed');
-        setTimeout(() => onClose(), 3000);
+        console.error("ICE connection failed - attempting TURN server fallback");
+
+        // Try to restart ICE with different servers
+        if (peerConnectionRef.current && peerConnectionRef.current.restartIce) {
+          console.log("Restarting ICE with alternative servers");
+          peerConnectionRef.current.restartIce();
+        } else {
+          console.log("ICE restart not supported, connection failed");
+          setCallState('failed');
+          setTimeout(() => onClose(), 3000);
+        }
+      } else if (peerConnectionRef.current.iceConnectionState === 'disconnected') {
+        console.warn("ICE connection disconnected - attempting to reconnect");
+        // Don't immediately fail, give it time to reconnect
       }
     };
 
-    // Handle connection state changes
+    // Handle connection state changes with quality tracking
     peerConnectionRef.current.onconnectionstatechange = () => {
       console.log("Peer connection state:", peerConnectionRef.current.connectionState);
       if (peerConnectionRef.current.connectionState === 'connected') {
         console.log("Peer connection fully established");
         setCallState('connected');
+        setConnectionQuality('good');
+        setConnectionAttempts(prev => prev + 1);
       } else if (peerConnectionRef.current.connectionState === 'failed') {
         console.error("Peer connection failed");
         setCallState('failed');
+        setConnectionQuality('failed');
         setTimeout(() => onClose(), 3000);
       } else if (peerConnectionRef.current.connectionState === 'disconnected') {
         console.warn("Peer connection disconnected");
+        setConnectionQuality('poor');
+      } else if (peerConnectionRef.current.connectionState === 'connecting') {
+        setConnectionQuality('connecting');
       }
     };
 
@@ -467,15 +502,41 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       hasRTCPeerConnection: !!window.RTCPeerConnection,
       connectionState: peerConnectionRef.current?.connectionState || 'Not connected',
       iceConnectionState: peerConnectionRef.current?.iceConnectionState || 'Not connected',
+      iceGatheringState: peerConnectionRef.current?.iceGatheringState || 'Not connected',
+      connectionQuality: connectionQuality,
+      connectionAttempts: connectionAttempts,
+      signalingState: peerConnectionRef.current?.signalingState || 'Not connected',
       localStreamTracks: localStreamRef.current ? {
         video: localStreamRef.current.getVideoTracks().length,
-        audio: localStreamRef.current.getAudioTracks().length
+        audio: localStreamRef.current.getAudioTracks().length,
+        videoEnabled: localStreamRef.current.getVideoTracks()[0]?.enabled,
+        audioEnabled: localStreamRef.current.getAudioTracks()[0]?.enabled
       } : null,
       remoteStreamTracks: remoteVideoRef.current?.srcObject ? {
         video: remoteVideoRef.current.srcObject.getVideoTracks().length,
-        audio: remoteVideoRef.current.srcObject.getAudioTracks().length
+        audio: remoteVideoRef.current.srcObject.getAudioTracks().length,
+        videoEnabled: remoteVideoRef.current.srcObject.getVideoTracks()[0]?.enabled,
+        audioEnabled: remoteVideoRef.current.srcObject.getAudioTracks()[0]?.enabled
       } : null,
-      timestamp: new Date().toISOString()
+      rtcConfiguration: rtcConfiguration,
+      timestamp: new Date().toISOString(),
+      troubleshooting: {
+        issue: "ICE connection failing on laptops",
+        possibleCauses: [
+          "TURN server authentication failed",
+          "Network firewall blocking TURN traffic",
+          "TURN server is down or rate limited",
+          "NAT traversal issues",
+          "Browser WebRTC policy restrictions"
+        ],
+        recommendations: [
+          "Try different network (WiFi vs mobile data)",
+          "Disable VPN if active",
+          "Check firewall settings",
+          "Try incognito/private browsing mode",
+          "Update browser to latest version"
+        ]
+      }
     };
 
     setConnectionDiagnostics(diagnostics);
@@ -483,8 +544,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
     // Copy diagnostics to clipboard for troubleshooting
     navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2))
-      .then(() => console.log("Diagnostics copied to clipboard"))
-      .catch(() => console.log("Failed to copy diagnostics"));
+      .then(() => {
+        console.log("Diagnostics copied to clipboard");
+        alert("Diagnostics copied to clipboard. Please share this information for troubleshooting.");
+      })
+      .catch(() => {
+        console.log("Failed to copy diagnostics");
+        alert("Failed to copy diagnostics. Please check browser console for details.");
+      });
   };
 
   // Socket event listeners
@@ -650,12 +717,39 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
       {/* Call Status */}
       <div className="text-white text-center mb-6">
-        {callState === 'calling' && <p className="text-lg">Calling {selectedUser?.fullName}...</p>}
-        {callState === 'ringing' && <p className="text-lg">Ringing...</p>}
-        {callState === 'connecting' && <p className="text-lg">Connecting...</p>}
-        {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
-        {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
-        {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          {callState === 'calling' && <p className="text-lg">Calling {selectedUser?.fullName}...</p>}
+          {callState === 'ringing' && <p className="text-lg">Ringing...</p>}
+          {callState === 'connecting' && <p className="text-lg">Connecting...</p>}
+          {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
+          {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
+          {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
+
+          {/* Connection Quality Indicator */}
+          {callState === 'connected' && (
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${
+                connectionQuality === 'good' ? 'bg-green-400' :
+                connectionQuality === 'poor' ? 'bg-yellow-400' :
+                connectionQuality === 'failed' ? 'bg-red-400' :
+                'bg-gray-400'
+              } animate-pulse`}></div>
+              <span className="text-sm text-gray-300">
+                {connectionQuality === 'good' ? 'Good' :
+                 connectionQuality === 'poor' ? 'Poor' :
+                 connectionQuality === 'failed' ? 'Failed' :
+                 'Connecting...'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Connection Attempts Counter */}
+        {connectionAttempts > 0 && (
+          <p className="text-xs text-gray-400">
+            Connection attempts: {connectionAttempts}
+          </p>
+        )}
       </div>
 
       {/* Control Buttons */}
