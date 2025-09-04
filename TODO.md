@@ -6,6 +6,9 @@
 - [x] Update WebRTC flow: invitation -> accept -> offer/answer -> connect
 - [x] Add calling states: calling, ringing, connected
 - [x] Handle decline: close call and notify other party
+- [x] Fix popup reappearance after accept
+- [x] Synchronize connections/disconnections
+- [x] Optimize video calling feature
 - [x] Test the flow: initiate call, receive popup, accept/decline
 
 ## Current Status
