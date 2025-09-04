@@ -5,54 +5,7 @@ import { ChatContext } from '../../context/ChatContext'
 import { AuthContext } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
 import VideoCallNew from './VideoCallNew'
-
-// Add CSS styles for animated typing dots
-const typingDotsStyles = `
-  .typing-dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .typing-dots .dot {
-    width: 4px;
-    height: 4px;
-    background-color: #d1d5db;
-    border-radius: 50%;
-    animation: typing 1.4s infinite ease-in-out;
-  }
-
-  .typing-dots .dot:nth-child(1) {
-    animation-delay: -0.32s;
-  }
-
-  .typing-dots .dot:nth-child(2) {
-    animation-delay: -0.16s;
-  }
-
-  .typing-dots .dot:nth-child(3) {
-    animation-delay: 0s;
-  }
-
-  @keyframes typing {
-    0%, 80%, 100% {
-      transform: scale(0.8);
-      opacity: 0.5;
-    }
-    40% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-`;
-
-// Inject styles into the document head
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement("style");
-  styleSheet.type = "text/css";
-  styleSheet.innerText = typingDotsStyles;
-  document.head.appendChild(styleSheet);
-}
+import './TypingIndicator.css'
 
 const ChatContainer = () => {
 
@@ -266,9 +219,9 @@ const ChatContainer = () => {
             />
         </div>
         {selectedUser && typingUsers[selectedUser._id] && (
-          <div className="absolute bottom-16 left-4 flex items-center gap-1 text-xs text-gray-300 italic ml-2 bg-black bg-opacity-50 px-2 py-1 rounded-md z-20">
+          <div className="typing-indicator">
             {console.log("Typing indicator should show for user:", selectedUser._id, "typingUsers:", typingUsers)}
-            <span>Typing</span>
+            <span className="typing-text">Typing</span>
             <span className="typing-dots">
               <span className="dot"></span>
               <span className="dot"></span>
