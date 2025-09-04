@@ -33,7 +33,9 @@ export const ChatProvider = ({ children })=>{
         }
     }, [selectedUser]);
 
-    const {socket, axios} = useContext(AuthContext);
+    const {socket, axios, authUser} = useContext(AuthContext);
+
+    console.log("ChatContext - authUser:", authUser);
 
     // function to get all users for sidebar
     const getUsers = async () =>{
@@ -161,7 +163,9 @@ export const ChatProvider = ({ children })=>{
 
     // function to send typing event
     const sendTyping = () => {
+        console.log("sendTyping called - socket:", !!socket, "selectedUser:", selectedUser, "authUser:", authUser);
         if(socket && selectedUser && authUser) {
+            console.log("Emitting typing event with:", { to: selectedUser._id, from: authUser._id });
             socket.emit("typing", { to: selectedUser._id, from: authUser._id });
         }
     }
