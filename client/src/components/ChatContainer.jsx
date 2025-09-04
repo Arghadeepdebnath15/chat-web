@@ -150,17 +150,17 @@ const ChatContainer = () => {
           </div>
         ) : (
           messages.map((msg, index)=>(
-            <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
+            <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
                 {msg.image ? (
                     <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
                 ):(
 
-                    <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
+                    <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${authUser && msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
                 )}
                 <div className="text-center text-xs">
-                    <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 h-7 rounded-full shadow-md object-cover' />
+                    <img src={authUser && msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 h-7 rounded-full shadow-md object-cover' />
                     <p className='text-gray-400 mt-1'>{formatMessageTime(msg.createdAt)}</p>
-                    {msg.senderId === authUser._id && msg.seen && (
+                    {authUser && msg.senderId === authUser._id && msg.seen && (
                         <p className='text-blue-400 text-xs mt-1 font-medium'>Seen</p>
                     )}
                 </div>
