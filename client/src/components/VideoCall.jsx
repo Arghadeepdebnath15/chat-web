@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from "react";
+import React, { useEffect, useRef, useState, useContext, useCallback } from "react";
 import { ChatContext } from "../../context/ChatContext";
 
 const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
@@ -94,6 +94,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // Start outgoing call
   const startCall = async () => {
+    console.log("Starting call process...");
     setCallState('calling');
 
     const stream = await getUserMedia();
@@ -266,6 +267,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
     // Start call if outgoing
     if (!isIncoming) {
+      console.log("Starting outgoing call to:", selectedUser._id);
       socket.emit("webrtc-call-invitation", { to: selectedUser._id });
       setCallState('calling');
     }
@@ -279,6 +281,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       endCall();
     };
   }, [socket, selectedUser, isIncoming]);
+
+  // Handle outgoing call initialization
+  useEffect(() => {
+    if (!isIncoming && socket && selectedUser) {
+      console.log("Initializing outgoing call...");
+      startCall();
+    }
+  }, [isIncoming, socket, selectedUser]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-50 p-4">
