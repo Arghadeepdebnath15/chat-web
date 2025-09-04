@@ -13,10 +13,12 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [pendingOffer, setPendingOffer] = useState(null);
+  const pendingOfferRef = useRef(null);
 
   // Debug pendingOffer changes
   useEffect(() => {
     console.log("pendingOffer state changed:", pendingOffer);
+    pendingOfferRef.current = pendingOffer;
   }, [pendingOffer]);
 
   // WebRTC Configuration with STUN/TURN servers
@@ -169,28 +171,23 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
     try {
       console.log("Setting remote description from pending offer...");
-      console.log("Current pending offer:", pendingOffer);
+      console.log("Current pending offer from ref:", pendingOfferRef.current);
 
-      // Use a callback to ensure we get the latest state
-      let currentOffer = null;
-      setPendingOffer(current => {
-        currentOffer = current;
-        console.log("Retrieved pending offer in callback:", current);
-        return current;
-      });
+      // Defensive check: if pendingOfferRef.current is null, wait briefly for it to be set
+      if (!pendingOfferRef.current) {
+        console.warn("Pending offer is null, waiting briefly for it to be set...");
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-      // Wait for state update
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      if (!currentOffer) {
-        console.error("No pending offer available!");
+      if (!pendingOfferRef.current) {
+        console.error("No pending offer available in ref after wait!");
         setCallState('failed');
         onClose();
         return;
       }
 
       // Set remote description from pending offer
-      await pc.setRemoteDescription(new RTCSessionDescription(currentOffer));
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
       console.log("Remote description set successfully");
 
       console.log("Creating answer...");
@@ -302,13 +299,18 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       console.log("Received offer from:", from);
       console.log("Offer type:", offer?.type);
       console.log("Offer sdp length:", offer?.sdp?.length);
+      console.log("Full offer object:", offer);
 
       if (offer && offer.type && offer.sdp) {
+        console.log("Storing offer in ref and state...");
         // Use functional update to ensure latest state
         setPendingOffer(() => offer);
+        pendingOfferRef.current = offer;
+        console.log("Offer stored in ref:", pendingOfferRef.current);
         setCallState('incoming');
         setShowAcceptPopup(true);
         console.log("Offer stored successfully, popup should show");
+        console.log("Current callState should be 'incoming', showAcceptPopup should be true");
       } else {
         console.error("Invalid offer received:", offer);
       }
