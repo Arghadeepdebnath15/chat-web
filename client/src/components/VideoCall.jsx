@@ -79,22 +79,30 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-        setRemoteVideoLoading(false);
-        setCallState('connected');
+      console.log("Received remote track:", event.track.kind, "from stream:", event.streams[0]?.id);
 
-        // Try to play the video, handle autoplay restrictions
+      if (remoteVideoRef.current && event.streams[0]) {
+        console.log("Setting remote video srcObject with stream:", event.streams[0].id);
+        remoteVideoRef.current.srcObject = event.streams[0];
+
+        // Try to play the video immediately when we get the track
         const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
             console.log("Remote video playing successfully");
+            setRemoteVideoLoading(false);
           }).catch(error => {
             console.log("Autoplay blocked for remote video:", error);
-            // Show user interaction prompt
-            setCallState('autoplay-blocked');
+            // Even if autoplay is blocked, the video element should still show the stream
+            // Just don't set it as loading anymore
+            setRemoteVideoLoading(false);
           });
+        } else {
+          // If play() returns undefined, video should still work
+          setRemoteVideoLoading(false);
         }
+      } else {
+        console.log("Remote video ref not ready or no stream received");
       }
     };
 
@@ -108,16 +116,22 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     pc.onconnectionstatechange = () => {
+      console.log("Connection state changed:", pc.connectionState);
+
       if (pc.connectionState === 'connected') {
+        console.log("Peer connection established successfully");
         setCallState('connected');
         setConnectionQuality('good');
       } else if (pc.connectionState === 'failed') {
+        console.log("Peer connection failed");
         setCallState('failed');
         setConnectionQuality('failed');
         setTimeout(() => onClose(), 3000);
       } else if (pc.connectionState === 'disconnected') {
+        console.log("Peer connection disconnected");
         setConnectionQuality('poor');
       } else if (pc.connectionState === 'connecting') {
+        console.log("Peer connection connecting...");
         setConnectionQuality('connecting');
       }
     };
@@ -366,6 +380,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     if (!socket || !selectedUser) return;
 
     const handleOffer = ({ from, offer }) => {
+      console.log("Received offer from:", from);
       setPendingOffer(offer);
       pendingOfferRef.current = offer;
       setCallState('incoming');
@@ -373,9 +388,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     const handleAnswer = async ({ answer }) => {
+      console.log("Received answer");
       if (peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log("Remote description set successfully");
         } catch (error) {
           console.error("Error setting remote description:", error);
         }
@@ -383,9 +400,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     const handleIceCandidate = async ({ candidate }) => {
+      console.log("Received ICE candidate");
       if (peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log("ICE candidate added successfully");
         } catch (error) {
           console.error("Error adding ICE candidate:", error);
         }
@@ -523,7 +542,18 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              muted={false}
               className="w-full h-72 object-cover"
+              onLoadedData={() => {
+                console.log("Remote video loaded data successfully");
+                setRemoteVideoLoading(false);
+              }}
+              onCanPlay={() => {
+                console.log("Remote video can play");
+              }}
+              onError={(e) => {
+                console.error("Remote video error:", e);
+              }}
             />
             <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
               {selectedUser?.fullName || "Remote User"}
@@ -533,25 +563,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
               </div>
             )}
-            {callState === 'autoplay-blocked' && (
+            {remoteVideoLoading && callState === 'connected' && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
                 <div className="text-center">
-                  <button
-                    onClick={() => {
-                      if (remoteVideoRef.current) {
-                        remoteVideoRef.current.play().then(() => {
-                          setCallState('connected');
-                        }).catch(console.error);
-                      }
-                    }}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg mb-2"
-                  >
-                    <svg className="w-6 h-6 inline mr-2" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                    Enable Remote Video
-                  </button>
-                  <p className="text-white text-sm">Click to enable remote video</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-2"></div>
+                  <p className="text-white text-sm">Waiting for remote video...</p>
                 </div>
               </div>
             )}
@@ -568,7 +584,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
           {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
           {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
           {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
-          {callState === 'autoplay-blocked' && <p className="text-lg text-yellow-400">Click to enable remote video</p>}
+          {callState === 'connected' && !remoteVideoRef.current?.srcObject && <p className="text-lg text-yellow-400">Waiting for remote video stream...</p>}
           {callState === 'local-autoplay-blocked' && <p className="text-lg text-yellow-400">Click to enable camera</p>}
 
           {/* Connection Quality Indicator */}
