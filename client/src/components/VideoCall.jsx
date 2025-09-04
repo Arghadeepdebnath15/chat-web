@@ -103,13 +103,18 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
+      console.log("Creating WebRTC offer...");
       const offer = await pc.createOffer();
+      console.log("Offer created:", offer);
       await pc.setLocalDescription(offer);
+      console.log("Local description set");
 
+      console.log("Sending offer to server for user:", selectedUser._id);
       socket.emit("webrtc-offer", {
         to: selectedUser._id,
         offer,
       });
+      console.log("Offer sent to server");
 
       setCallState('ringing');
     } catch (error) {

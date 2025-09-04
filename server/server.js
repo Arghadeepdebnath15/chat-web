@@ -57,9 +57,14 @@ io.on("connection",(socket)=>{
 
     // WebRTC signaling events
     socket.on("webrtc-offer", (data) => {
+        console.log("Server received webrtc-offer from", userId, "to", data.to);
+        console.log("Offer data:", data.offer);
         const toSocketId = userSocketMap[data.to];
         if (toSocketId) {
+            console.log("Forwarding offer to socket:", toSocketId);
             socket.to(toSocketId).emit("webrtc-offer", { from: userId, offer: data.offer });
+        } else {
+            console.log("No socket found for user:", data.to);
         }
     });
 
