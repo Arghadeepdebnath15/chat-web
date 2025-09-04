@@ -329,36 +329,44 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         </div>
       )}
 
-      {/* Video Container */}
-      <div className="flex gap-4 mb-6 w-full max-w-4xl">
-        {/* Local Video */}
-        <div className="flex-1">
-          <div className="relative bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+      {/* Video Container - Side by Side Layout */}
+      <div className="flex gap-6 mb-6 w-full max-w-6xl justify-center">
+        {/* Local Video (Your Video) */}
+        <div className="flex-1 max-w-md">
+          <div className="relative bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-blue-500">
             <video
               ref={localVideoRef}
               autoPlay
               muted
               playsInline
-              className="w-full h-64 object-cover"
+              className="w-full h-72 object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+            <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
               You {isMuted && "(Muted)"} {isVideoOff && "(Video Off)"}
+            </div>
+            <div className="absolute top-3 right-3">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
           </div>
         </div>
 
-        {/* Remote Video */}
-        <div className="flex-1">
-          <div className="relative bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+        {/* Remote Video (Other Person's Video) */}
+        <div className="flex-1 max-w-md">
+          <div className="relative bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-600">
             <video
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-64 object-cover"
+              className="w-full h-72 object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-              {selectedUser?.fullName || "Remote"}
+            <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
+              {selectedUser?.fullName || "Remote User"}
             </div>
+            {callState === 'connected' && (
+              <div className="absolute top-3 right-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
+            )}
           </div>
         </div>
       </div>
