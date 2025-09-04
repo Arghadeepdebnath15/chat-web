@@ -14,6 +14,7 @@ const ChatContainer = () => {
     const { authUser, onlineUsers } = useContext(AuthContext)
 
     const scrollEnd = useRef()
+    const typingTimeoutRef = useRef(null);
 
     const [input, setInput] = useState('');
     const [showVideoCall, setShowVideoCall] = useState(false);
@@ -43,6 +44,17 @@ const ChatContainer = () => {
         reader.readAsDataURL(file)
     }
 
+    // Handle typing indicator with debounce
+    const handleTyping = () => {
+        sendTyping();
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+            stopTyping();
+        }, 1000); // 1 second after user stops typing
+    };
+
     useEffect(()=>{
         if(selectedUser){
             // Clear messages immediately when switching users to prevent showing old chat content
@@ -70,6 +82,15 @@ const ChatContainer = () => {
             setIncomingCall(null); // Clear after showing
         }
     }, [incomingCall, setIncomingCall, users, setSelectedUser])
+
+    // Cleanup typing timeout when component unmounts or selectedUser changes
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+        };
+    }, [selectedUser]);
 
     const handleVideoCallClose = () => {
         setShowVideoCall(false);
@@ -174,7 +195,7 @@ const ChatContainer = () => {
     <div className='absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/50 to-transparent transition-all duration-500 ease-out'>
         <div className='flex items-center gap-2'>
             <div className='flex-1 flex items-center bg-gradient-to-r from-indigo-800/50 to-purple-800/50 px-4 py-2 rounded-full border-2 border-pink-400 shadow-lg backdrop-blur-sm'>
-                <input onChange={(e)=> {setInput(e.target.value); sendTyping();}} onBlur={stopTyping} value={input} onKeyDown={(e)=> e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder="Send a message..."
+                <input onChange={(e)=> {setInput(e.target.value); handleTyping();}} onBlur={() => { if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); } stopTyping(); }} value={input} onKeyDown={(e)=> e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder="Send a message..."
                 className='flex-1 text-sm p-2 border-none outline-none text-white placeholder-gray-400 bg-transparent focus:ring-2 focus:ring-blue-500 rounded-md transition-all'/>
                 <input onChange={handleSendImage} type="file" id='image' accept='image/png, image/jpeg' hidden/>
                 <label htmlFor="image">
