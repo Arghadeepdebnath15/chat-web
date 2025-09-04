@@ -14,6 +14,8 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [pendingOffer, setPendingOffer] = useState(null);
   const [pendingOfferRef] = useState({ current: null });
+  const [localVideoLoading, setLocalVideoLoading] = useState(true);
+  const [remoteVideoLoading, setRemoteVideoLoading] = useState(true);
 
   // WebRTC Configuration
   const rtcConfiguration = {
@@ -57,7 +59,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       console.log("Received remote stream");
       if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        setRemoteVideoLoading(false);
         setCallState('connected');
+
+        // Ensure remote video plays
+        remoteVideoRef.current.onloadedmetadata = () => {
+          console.log("Remote video metadata loaded");
+          remoteVideoRef.current.play().catch(console.error);
+        };
       }
     };
 
@@ -75,8 +84,27 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       console.log("Permissions granted, local stream obtained");
       localStreamRef.current = stream;
 
+      // Ensure local video element is ready and set the stream
       if (localVideoRef.current) {
+        console.log("Setting local video srcObject");
         localVideoRef.current.srcObject = stream;
+
+        // Add event listener to ensure video is loaded
+        localVideoRef.current.onloadedmetadata = () => {
+          console.log("Local video metadata loaded");
+          setLocalVideoLoading(false);
+          localVideoRef.current.play().catch(console.error);
+        };
+
+        // Force play in case autoplay is blocked
+        setTimeout(() => {
+          if (localVideoRef.current && localVideoRef.current.paused) {
+            localVideoRef.current.play().catch(console.error);
+          }
+          setLocalVideoLoading(false);
+        }, 100);
+      } else {
+        console.warn("Local video element not ready");
       }
 
       return stream;
@@ -341,6 +369,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
               playsInline
               className="w-full h-72 object-cover"
             />
+            {localVideoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p className="text-white text-sm">Loading camera...</p>
+                </div>
+              </div>
+            )}
             <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
               You {isMuted && "(Muted)"} {isVideoOff && "(Video Off)"}
             </div>
