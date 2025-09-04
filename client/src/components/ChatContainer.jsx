@@ -17,6 +17,7 @@ const ChatContainer = () => {
 
     const [input, setInput] = useState('');
     const [showVideoCall, setShowVideoCall] = useState(false);
+    const [incomingCallDetails, setIncomingCallDetails] = useState(null);
 
     // Handle sending a message
     const handleSendMessage = async (e)=>{
@@ -59,10 +60,16 @@ const ChatContainer = () => {
 
     useEffect(() => {
         if (incomingCall) {
+            setIncomingCallDetails(incomingCall);
             setShowVideoCall(true);
             setIncomingCall(null); // Clear after showing
         }
     }, [incomingCall, setIncomingCall])
+
+    const handleVideoCallClose = () => {
+        setShowVideoCall(false);
+        setIncomingCallDetails(null);
+    }
 
   return selectedUser ? (
     <div className='h-full overflow-scroll relative backdrop-blur-lg'>
@@ -182,7 +189,13 @@ const ChatContainer = () => {
         )}
     </div>
 
-    {showVideoCall && <VideoCall onClose={() => setShowVideoCall(false)} />}
+    {showVideoCall && (
+        <VideoCall
+            onClose={handleVideoCallClose}
+            isIncoming={!!incomingCallDetails}
+            caller={incomingCallDetails?.from}
+        />
+    )}
 
     </div>
   ) : (

@@ -141,6 +141,14 @@ export const ChatProvider = ({ children })=>{
         socket.on("webrtc-call-invitation", ({ from }) => {
             setIncomingCall({ from });
         });
+
+        socket.on("webrtc-call-accept", () => {
+            // Handle call accepted by remote user if needed
+        });
+
+        socket.on("webrtc-call-decline", () => {
+            // Handle call declined by remote user if needed
+        });
     }
 
     // function to send typing event

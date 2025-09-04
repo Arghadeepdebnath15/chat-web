@@ -84,6 +84,28 @@ io.on("connection",(socket)=>{
         }
     });
 
+    // Video call invitation events
+    socket.on("webrtc-call-invitation", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-call-invitation", { from: userId });
+        }
+    });
+
+    socket.on("webrtc-accept", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-accept");
+        }
+    });
+
+    socket.on("webrtc-decline", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-decline");
+        }
+    });
+
     socket.on("disconnect", ()=>{
         console.log("User Disconnected", userId);
         delete userSocketMap[userId];
