@@ -4,6 +4,7 @@ import { formatMessageTime } from '../lib/utils'
 import { ChatContext } from '../../context/ChatContext'
 import { AuthContext } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
+import VideoCall from './VideoCall'
 
 const ChatContainer = () => {
 
@@ -15,6 +16,7 @@ const ChatContainer = () => {
     const scrollEnd = useRef()
 
     const [input, setInput] = useState('');
+    const [showVideoCall, setShowVideoCall] = useState(false);
 
     // Handle sending a message
     const handleSendMessage = async (e)=>{
@@ -92,6 +94,26 @@ const ChatContainer = () => {
 
         {/* Action buttons with enhanced styling */}
         <div className='flex items-center gap-2 relative z-10'>
+          <button
+            onClick={() => setShowVideoCall(true)}
+            title="Start Video Call"
+            className="p-1 rounded-full hover:bg-white/10 transition-all duration-300"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-6 h-6 text-white"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"
+              />
+            </svg>
+          </button>
           <img onClick={()=> setSelectedUser(null)} src={assets.arrow_icon} alt=""
                className='md:hidden max-w-7 hover:opacity-80 transition-all duration-300 cursor-pointer hover:scale-110 p-1 rounded-full hover:bg-white/10'/>
           <img src={assets.help_icon} alt=""
@@ -153,6 +175,7 @@ const ChatContainer = () => {
         )}
     </div>
 
+    {showVideoCall && <VideoCall onClose={() => setShowVideoCall(false)} />}
 
     </div>
   ) : (

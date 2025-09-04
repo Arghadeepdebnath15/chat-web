@@ -55,6 +55,35 @@ io.on("connection",(socket)=>{
         }
     });
 
+    // WebRTC signaling events
+    socket.on("webrtc-offer", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-offer", { from: userId, offer: data.offer });
+        }
+    });
+
+    socket.on("webrtc-answer", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-answer", { answer: data.answer });
+        }
+    });
+
+    socket.on("webrtc-candidate", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-candidate", { candidate: data.candidate });
+        }
+    });
+
+    socket.on("webrtc-call-ended", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("webrtc-call-ended");
+        }
+    });
+
     socket.on("disconnect", ()=>{
         console.log("User Disconnected", userId);
         delete userSocketMap[userId];
