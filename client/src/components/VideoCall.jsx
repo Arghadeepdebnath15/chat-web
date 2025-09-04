@@ -370,7 +370,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
               className="w-full h-72 object-cover"
             />
             {localVideoLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-2"></div>
                   <p className="text-white text-sm">Loading camera...</p>
