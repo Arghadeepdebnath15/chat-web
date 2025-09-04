@@ -30,31 +30,32 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       { urls: "stun:stun3.l.google.com:19302" },
       { urls: "stun:stun4.l.google.com:19302" },
 
-      // Working TURN servers (updated with reliable public servers)
+      // Reliable TURN servers (updated with working public servers)
       {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject"
+        urls: "turn:turn.bistri.com:80",
+        username: "homeo",
+        credential: "homeo"
       },
       {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject"
+        urls: "turn:turn.anyfirewall.com:443?transport=tcp",
+        username: "webrtc",
+        credential: "webrtc"
       },
       {
-        urls: "turn:openrelay.metered.ca:443?transport=tcp",
-        username: "openrelayproject",
-        credential: "openrelayproject"
+        urls: "turn:numb.viagenie.ca",
+        username: "webrtc@live.com",
+        credential: "muazkh"
       },
-      // Additional reliable TURN servers
+      // Additional fallback TURN servers
       {
-        urls: [
-          "turn:relay.metered.ca:80",
-          "turn:relay.metered.ca:443",
-          "turn:relay.metered.ca:443?transport=tcp"
-        ],
-        username: "free",
-        credential: "free"
+        urls: "turn:192.158.29.39:3478?transport=udp",
+        username: "28224511:1379330808",
+        credential: "JZEOEt2V3Qb0y27GRntt2u2PAY="
+      },
+      {
+        urls: "turn:192.158.29.39:3478?transport=tcp",
+        username: "28224511:1379330808",
+        credential: "JZEOEt2V3Qb0y27GRntt2u2PAY="
       }
     ],
     iceCandidatePoolSize: 10,
@@ -83,50 +84,72 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
       if (remoteVideoRef.current && event.streams[0]) {
         console.log("Setting remote video srcObject with stream:", event.streams[0].id);
+
+        // Clear any existing srcObject first
+        if (remoteVideoRef.current.srcObject) {
+          remoteVideoRef.current.srcObject = null;
+        }
+
+        // Set the new stream
         remoteVideoRef.current.srcObject = event.streams[0];
 
-        // Try to play the video immediately when we get the track
-        const playPromise = remoteVideoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log("Remote video playing successfully");
-            setRemoteVideoLoading(false);
-          }).catch(error => {
-            console.log("Autoplay blocked for remote video:", error);
-            // Even if autoplay is blocked, the video element should still show the stream
-            // Just don't set it as loading anymore
-            setRemoteVideoLoading(false);
-          });
-        } else {
-          // If play() returns undefined, video should still work
-          setRemoteVideoLoading(false);
-        }
+        // Force a reload of the video element
+        remoteVideoRef.current.load();
+
+        // Try to play the video with a small delay to ensure the stream is ready
+        setTimeout(() => {
+          if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+            const playPromise = remoteVideoRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => {
+                console.log("Remote video playing successfully");
+                setRemoteVideoLoading(false);
+              }).catch(error => {
+                console.log("Autoplay blocked for remote video:", error);
+                // Even if autoplay is blocked, the video element should still show the stream
+                // The user can manually click to play if needed
+                setRemoteVideoLoading(false);
+              });
+            } else {
+              // If play() returns undefined, video should still work
+              setRemoteVideoLoading(false);
+            }
+          }
+        }, 100);
       } else {
         console.log("Remote video ref not ready or no stream received");
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'connected') {
+      console.log("ICE connection state changed:", pc.iceConnectionState);
+      console.log("Peer connection state:", pc.connectionState);
+      console.log("Signaling state:", pc.signalingState);
+
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        console.log("ICE connection established successfully");
         setCallState('connected');
-      } else if (pc.iceConnectionState === 'failed') {
+      } else if (pc.iceConnectionState === 'connecting') {
+        console.log("ICE connecting...");
+        setCallState('connecting');
+      } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        console.log("ICE connection failed or disconnected");
         setCallState('failed');
         setTimeout(() => onClose(), 3000);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log("Connection state changed:", pc.connectionState);
-
-      if (pc.connectionState === 'connected') {
+      console.log("Peer connection state changed:", pc.connectionState);
+      if (pc.connectionState === 'failed') {
+        console.log("Peer connection failed - this may indicate TURN server issues");
+        setConnectionQuality('failed');
+        setCallState('failed');
+        setTimeout(() => onClose(), 3000);
+      } else if (pc.connectionState === 'connected') {
         console.log("Peer connection established successfully");
         setCallState('connected');
         setConnectionQuality('good');
-      } else if (pc.connectionState === 'failed') {
-        console.log("Peer connection failed");
-        setCallState('failed');
-        setConnectionQuality('failed');
-        setTimeout(() => onClose(), 3000);
       } else if (pc.connectionState === 'disconnected') {
         console.log("Peer connection disconnected");
         setConnectionQuality('poor');
@@ -569,6 +592,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-2"></div>
                   <p className="text-white text-sm">Waiting for remote video...</p>
                 </div>
+              </div>
+            )}
+
+            {/* Manual play button for remote video if autoplay is blocked */}
+            {callState === 'connected' && remoteVideoRef.current?.srcObject && remoteVideoRef.current?.paused && (
+              <div className="absolute bottom-4 right-4 z-40">
+                <button
+                  onClick={() => {
+                    if (remoteVideoRef.current) {
+                      remoteVideoRef.current.play().then(() => {
+                        console.log("Remote video manually started");
+                      }).catch(console.error);
+                    }
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm shadow-lg"
+                  title="Enable remote video"
+                >
+                  <svg className="w-5 h-5 inline mr-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  Play Remote
+                </button>
               </div>
             )}
           </div>
