@@ -13,25 +13,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [pendingOffer, setPendingOffer] = useState(null);
-  const pendingOfferRef = useRef(null);
+  const [pendingOfferRef] = useState({ current: null });
 
-  // Debug pendingOffer changes
-  useEffect(() => {
-    console.log("pendingOffer state changed:", pendingOffer);
-    pendingOfferRef.current = pendingOffer;
-  }, [pendingOffer]);
-
-  // WebRTC Configuration with STUN/TURN servers
+  // WebRTC Configuration
   const rtcConfiguration = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       {
         urls: "turn:turn.anyfirewall.com:443?transport=tcp",
-        username: "webrtc",
-        credential: "webrtc"
-      },
-      {
-        urls: "turn:turn.anyfirewall.com:443?transport=udp",
         username: "webrtc",
         credential: "webrtc"
       }
@@ -75,35 +64,26 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     return peerConnectionRef.current;
   };
 
-  // Get user media (camera and microphone)
+  // Get user media
   const getUserMedia = async () => {
     try {
-      console.log("=== GET USER MEDIA STARTED ===");
       console.log("Requesting camera and microphone permissions...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
       console.log("Permissions granted, local stream obtained");
-      console.log("Stream tracks:", stream.getTracks().map(track => ({ kind: track.kind, enabled: track.enabled })));
-
       localStreamRef.current = stream;
 
       if (localVideoRef.current) {
-        console.log("Setting local video srcObject");
         localVideoRef.current.srcObject = stream;
-        console.log("Local video element:", localVideoRef.current);
-      } else {
-        console.log("Local video ref is null!");
       }
 
       return stream;
     } catch (error) {
-      console.error("=== ERROR ACCESSING MEDIA DEVICES ===", error);
+      console.error("Error accessing media devices:", error);
       if (error.name === 'NotAllowedError') {
         alert("Camera and microphone access denied. Please allow permissions to make video calls.");
-      } else if (error.name === 'NotFoundError') {
-        alert("No camera or microphone found.");
       } else {
         alert("Error accessing camera and microphone: " + error.message);
       }
@@ -120,14 +100,9 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     if (!stream) return;
 
     const pc = createPeerConnection();
-
-    // Add local tracks to peer connection
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-    });
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
-      // Create and send offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
@@ -146,68 +121,39 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // Accept incoming call
   const acceptCall = async () => {
-    console.log("=== ACCEPT CALL STARTED ===");
-    console.log("Accept button clicked, starting accept process...");
+    console.log("Accepting call...");
     setShowAcceptPopup(false);
     setCallState('connecting');
 
-    console.log("Requesting user media...");
     const stream = await getUserMedia();
-    if (!stream) {
-      console.log("Failed to get user media, aborting accept");
-      return;
-    }
-    console.log("User media obtained successfully");
+    if (!stream) return;
 
-    console.log("Creating peer connection...");
     const pc = createPeerConnection();
-    console.log("Peer connection created");
-
-    // Add local tracks to peer connection
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-      console.log(`Added track to peer connection: ${track.kind}`);
-    });
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
-      console.log("Setting remote description from pending offer...");
-      console.log("Current pending offer from ref:", pendingOfferRef.current);
-
-      // Defensive check: if pendingOfferRef.current is null, wait briefly for it to be set
+      console.log("Setting remote description...");
       if (!pendingOfferRef.current) {
-        console.warn("Pending offer is null, waiting briefly for it to be set...");
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      if (!pendingOfferRef.current) {
-        console.error("No pending offer available in ref after wait!");
+        console.error("No pending offer available!");
         setCallState('failed');
         onClose();
         return;
       }
 
-      // Set remote description from pending offer
       await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
-      console.log("Remote description set successfully");
+      console.log("Remote description set");
 
-      console.log("Creating answer...");
-      // Create and send answer
       const answer = await pc.createAnswer();
-      console.log("Answer created:", answer);
       await pc.setLocalDescription(answer);
-      console.log("Local description set");
 
-      console.log("Sending answer to server...");
       socket.emit("webrtc-answer", {
         to: selectedUser._id,
         answer,
       });
-      console.log("Answer sent to server");
 
       setCallState('connected');
-      console.log("=== ACCEPT CALL COMPLETED SUCCESSFULLY ===");
     } catch (error) {
-      console.error("=== ERROR ACCEPTING CALL ===", error);
+      console.error("Error accepting call:", error);
       setCallState('failed');
       onClose();
     }
@@ -226,11 +172,9 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       peerConnectionRef.current = null;
     }
 
-    // Stop all media tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log(`Stopped track: ${track.kind}`);
       });
       localStreamRef.current = null;
     }
@@ -238,7 +182,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
       remoteVideoRef.current.srcObject.getTracks().forEach(track => {
         track.stop();
-        console.log(`Stopped remote track: ${track.kind}`);
       });
       remoteVideoRef.current.srcObject = null;
     }
@@ -273,50 +216,16 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   useEffect(() => {
     if (!socket || !selectedUser) return;
 
-    // Handle incoming call invitation
-    const handleCallInvitation = ({ from }) => {
-      console.log("Incoming call from:", from);
+    console.log("Setting up socket listeners for video call");
+
+    const handleOffer = ({ from, offer }) => {
+      console.log("Received WebRTC offer from:", from);
+      setPendingOffer(offer);
+      pendingOfferRef.current = offer;
       setCallState('incoming');
       setShowAcceptPopup(true);
     };
 
-    // Handle call acceptance
-    const handleCallAccepted = async () => {
-      console.log("Call accepted, starting call...");
-      await startCall();
-    };
-
-    // Handle call decline
-    const handleCallDeclined = () => {
-      console.log("Call declined");
-      setCallState('declined');
-      setTimeout(() => onClose(), 2000);
-    };
-
-    // Handle WebRTC offer
-    const handleOffer = ({ from, offer }) => {
-      console.log("=== RECEIVED WEBRTC OFFER ===");
-      console.log("Received offer from:", from);
-      console.log("Offer type:", offer?.type);
-      console.log("Offer sdp length:", offer?.sdp?.length);
-      console.log("Full offer object:", offer);
-
-      if (offer && offer.type && offer.sdp) {
-        console.log("Storing offer in ref and state...");
-        // Use functional update to ensure latest state
-        setPendingOffer(() => offer);
-        pendingOfferRef.current = offer;
-        console.log("Offer stored in ref:", pendingOfferRef.current);
-        setCallState('incoming');
-        setShowAcceptPopup(true);
-        console.log("Offer stored successfully, popup should show");
-        console.log("Current callState should be 'incoming', showAcceptPopup should be true");
-      } else {
-        console.error("Invalid offer received:", offer);
-      }
-    };
-
-    // Handle WebRTC answer
     const handleAnswer = async ({ answer }) => {
       console.log("Received answer");
       if (peerConnectionRef.current) {
@@ -328,7 +237,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       }
     };
 
-    // Handle ICE candidates
     const handleIceCandidate = async ({ candidate }) => {
       console.log("Received ICE candidate");
       if (peerConnectionRef.current) {
@@ -340,16 +248,12 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       }
     };
 
-    // Handle call ended
     const handleCallEnded = () => {
       console.log("Call ended by other party");
       endCall();
     };
 
     // Register event listeners
-    socket.on("webrtc-call-invitation", handleCallInvitation);
-    socket.on("webrtc-accept", handleCallAccepted);
-    socket.on("webrtc-decline", handleCallDeclined);
     socket.on("webrtc-offer", handleOffer);
     socket.on("webrtc-answer", handleAnswer);
     socket.on("webrtc-candidate", handleIceCandidate);
@@ -363,9 +267,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
     // Cleanup
     return () => {
-      socket.off("webrtc-call-invitation", handleCallInvitation);
-      socket.off("webrtc-accept", handleCallAccepted);
-      socket.off("webrtc-decline", handleCallDeclined);
       socket.off("webrtc-offer", handleOffer);
       socket.off("webrtc-answer", handleAnswer);
       socket.off("webrtc-candidate", handleIceCandidate);
@@ -454,7 +355,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         {callState === 'connecting' && <p className="text-lg">Connecting...</p>}
         {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
         {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
-        {callState === 'declined' && <p className="text-lg text-red-400">Call declined</p>}
+        {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
       </div>
 
       {/* Control Buttons */}
