@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
 import { ChatContext } from "../../context/ChatContext";
 
-const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
+export default function VideoCall({ onClose, isIncoming = false, caller = null }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -17,6 +17,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       // Add TURN servers here if needed
     ],
   };
+
+  useEffect(() => {
+    setShowAcceptPopup(isIncoming);
+    setCallingState(isIncoming ? 'incoming' : 'calling');
+  }, [isIncoming]);
 
   useEffect(() => {
     if (!socket || !selectedUser) return;
