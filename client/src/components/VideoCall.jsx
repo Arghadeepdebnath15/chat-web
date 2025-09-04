@@ -21,10 +21,11 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const rtcConfiguration = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
       {
-        urls: "turn:turn.anyfirewall.com:443?transport=tcp",
-        username: "webrtc",
-        credential: "webrtc"
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject"
       }
     ],
   };
@@ -65,7 +66,9 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         // Ensure remote video plays
         remoteVideoRef.current.onloadedmetadata = () => {
           console.log("Remote video metadata loaded");
-          remoteVideoRef.current.play().catch(console.error);
+          remoteVideoRef.current.play().catch((error) => {
+            console.error("Error playing remote video:", error);
+          });
         };
       }
     };

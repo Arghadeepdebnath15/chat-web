@@ -8,7 +8,7 @@ import VideoCall from './VideoCall'
 
 const ChatContainer = () => {
 
-    const { messages, selectedUser, setSelectedUser, sendMessage,
+    const { messages, users, selectedUser, setSelectedUser, sendMessage,
         getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages, incomingCall, setIncomingCall } = useContext(ChatContext)
 
     const { authUser, onlineUsers } = useContext(AuthContext)
@@ -60,11 +60,16 @@ const ChatContainer = () => {
 
     useEffect(() => {
         if (incomingCall) {
+            // Find the caller user from the users list
+            const callerUser = users.find(u => u._id === incomingCall.from);
+            if (callerUser) {
+                setSelectedUser(callerUser); // Switch to the caller
+            }
             setIncomingCallDetails(incomingCall);
             setShowVideoCall(true);
             setIncomingCall(null); // Clear after showing
         }
-    }, [incomingCall, setIncomingCall])
+    }, [incomingCall, setIncomingCall, users, setSelectedUser])
 
     const handleVideoCallClose = () => {
         setShowVideoCall(false);
