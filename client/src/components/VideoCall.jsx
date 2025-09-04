@@ -19,6 +19,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [connectionDiagnostics, setConnectionDiagnostics] = useState(null);
   const [connectionQuality, setConnectionQuality] = useState('unknown');
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [retryTimeout, setRetryTimeout] = useState(null);
 
   // WebRTC Configuration with reliable TURN servers
   const rtcConfiguration = {
@@ -129,13 +130,31 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         console.log("ICE connection established successfully");
         setCallState('connected');
+        // Clear any pending retry timeout on successful connection
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+          setRetryTimeout(null);
+        }
       } else if (pc.iceConnectionState === 'connecting') {
         console.log("ICE connecting...");
         setCallState('connecting');
       } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
         console.log("ICE connection failed or disconnected");
         setCallState('failed');
-        setTimeout(() => onClose(), 3000);
+        // Don't automatically close the call - let user decide
+        // setTimeout(() => onClose(), 3000);
+
+        // Retry connection after delay if attempts < 3
+        if (connectionAttempts < 3) {
+          const timeout = setTimeout(() => {
+            console.log("Retrying connection attempt", connectionAttempts + 1);
+            setConnectionAttempts(prev => prev + 1);
+            if (peerConnectionRef.current) {
+              peerConnectionRef.current.restartIce();
+            }
+          }, 5000);
+          setRetryTimeout(timeout);
+        }
       }
     };
 
@@ -145,7 +164,8 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         console.log("Peer connection failed - this may indicate TURN server issues");
         setConnectionQuality('failed');
         setCallState('failed');
-        setTimeout(() => onClose(), 3000);
+        // Don't automatically close the call - let user decide
+        // setTimeout(() => onClose(), 3000);
       } else if (pc.connectionState === 'connected') {
         console.log("Peer connection established successfully");
         setCallState('connected');
@@ -300,6 +320,12 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         });
         remoteVideoRef.current.srcObject = null;
       }
+    }
+
+    // Clear any pending retry timeout
+    if (retryTimeout) {
+      clearTimeout(retryTimeout);
+      setRetryTimeout(null);
     }
 
     // Reset all states
@@ -627,7 +653,8 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
           {callState === 'ringing' && <p className="text-lg">Ringing...</p>}
           {callState === 'connecting' && <p className="text-lg">Connecting...</p>}
           {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
-          {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
+          {callState === 'failed' && connectionAttempts < 3 && <p className="text-lg text-red-400">Connection failed - Click retry to try again</p>}
+          {callState === 'failed' && connectionAttempts >= 3 && <p className="text-lg text-red-400">Connection failed - Please try a new call</p>}
           {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
           {callState === 'connected' && !remoteVideoRef.current?.srcObject && <p className="text-lg text-yellow-400">Waiting for remote video stream...</p>}
           {callState === 'local-autoplay-blocked' && <p className="text-lg text-yellow-400">Click to enable camera</p>}
@@ -655,6 +682,9 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         {connectionAttempts > 0 && (
           <p className="text-xs text-gray-400">
             Connection attempts: {connectionAttempts}
+            {retryTimeout && connectionAttempts < 3 && (
+              <span className="ml-2 text-yellow-400">Retrying in 5 seconds...</span>
+            )}
           </p>
         )}
       </div>
@@ -700,6 +730,26 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
             </svg>
           )}
         </button>
+
+        {/* Retry Connection Button (only show when failed) */}
+        {callState === 'failed' && connectionAttempts < 3 && (
+          <button
+            onClick={() => {
+              console.log("Manual retry initiated");
+              setConnectionAttempts(prev => prev + 1);
+              if (peerConnectionRef.current) {
+                peerConnectionRef.current.restartIce();
+              }
+              setCallState('connecting');
+            }}
+            className="p-3 bg-orange-500 hover:bg-orange-600 rounded-full transition-colors"
+            title="Retry Connection"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
 
         {/* Diagnostics Button */}
         <button
