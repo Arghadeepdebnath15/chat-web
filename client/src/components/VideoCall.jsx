@@ -20,6 +20,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [connectionQuality, setConnectionQuality] = useState('unknown');
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [retryTimeout, setRetryTimeout] = useState(null);
+  const [remoteVideoPlaying, setRemoteVideoPlaying] = useState(false);
 
   // WebRTC Configuration with reliable TURN servers
   const rtcConfiguration = {
@@ -99,20 +100,29 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
         // Try to play the video with a small delay to ensure the stream is ready
         setTimeout(() => {
-          if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-            const playPromise = remoteVideoRef.current.play();
-            if (playPromise !== undefined) {
-              playPromise.then(() => {
-                console.log("Remote video playing successfully");
+          if (remoteVideoRef.current && remoteVideoRef.current.srcObject && !remoteVideoPlaying) {
+            // Ensure video is not already playing to avoid conflicts
+            if (remoteVideoRef.current.paused || remoteVideoRef.current.ended) {
+              const playPromise = remoteVideoRef.current.play();
+              if (playPromise !== undefined) {
+                playPromise.then(() => {
+                  console.log("Remote video playing successfully");
+                  setRemoteVideoPlaying(true);
+                  setRemoteVideoLoading(false);
+                }).catch(error => {
+                  console.log("Autoplay blocked for remote video:", error);
+                  // Even if autoplay is blocked, the video element should still show the stream
+                  // The user can manually click to play if needed
+                  setRemoteVideoLoading(false);
+                });
+              } else {
+                // If play() returns undefined, video should still work
+                setRemoteVideoPlaying(true);
                 setRemoteVideoLoading(false);
-              }).catch(error => {
-                console.log("Autoplay blocked for remote video:", error);
-                // Even if autoplay is blocked, the video element should still show the stream
-                // The user can manually click to play if needed
-                setRemoteVideoLoading(false);
-              });
+              }
             } else {
-              // If play() returns undefined, video should still work
+              console.log("Remote video already playing");
+              setRemoteVideoPlaying(true);
               setRemoteVideoLoading(false);
             }
           }
@@ -311,14 +321,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       localStreamRef.current = null;
     }
 
-    // Clear remote video
+    // Clear remote video with proper cleanup
     if (remoteVideoRef.current) {
-      if (remoteVideoRef.current.srcObject) {
-        remoteVideoRef.current.srcObject.getTracks().forEach(track => {
-          track.stop();
-          console.log("Stopped remote track:", track.kind);
-        });
-        remoteVideoRef.current.srcObject = null;
+      try {
+        // Pause the video element first to prevent autoplay conflicts
+        remoteVideoRef.current.pause();
+
+        if (remoteVideoRef.current.srcObject) {
+          remoteVideoRef.current.srcObject.getTracks().forEach(track => {
+            track.stop();
+            console.log("Stopped remote track:", track.kind);
+          });
+          remoteVideoRef.current.srcObject = null;
+        }
+
+        // Reset video element state
+        remoteVideoRef.current.load();
+      } catch (error) {
+        console.log("Error during remote video cleanup:", error);
+        // Force cleanup even if there's an error
+        if (remoteVideoRef.current.srcObject) {
+          remoteVideoRef.current.srcObject = null;
+        }
       }
     }
 
@@ -334,6 +358,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     setIsVideoOff(false);
     setLocalVideoLoading(true);
     setRemoteVideoLoading(true);
+    setRemoteVideoPlaying(false);
     setPendingOffer(null);
     setConnectionQuality('unknown');
     setConnectionAttempts(0);
@@ -625,14 +650,27 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
             {callState === 'connected' && remoteVideoRef.current?.srcObject && remoteVideoRef.current?.paused && (
               <div className="absolute bottom-4 right-4 z-40">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (remoteVideoRef.current) {
-                      remoteVideoRef.current.play().then(() => {
-                        console.log("Remote video manually started");
-                      }).catch(console.error);
+                      try {
+                        // Check if video is already playing to avoid conflicts
+                        if (!remoteVideoRef.current.paused && !remoteVideoRef.current.ended) {
+                          console.log("Remote video already playing");
+                          return;
+                        }
+
+                        const playPromise = remoteVideoRef.current.play();
+                        if (playPromise !== undefined) {
+                          await playPromise;
+                          console.log("Remote video manually started");
+                          setRemoteVideoPlaying(true);
+                        }
+                      } catch (error) {
+                        console.error("Manual play failed:", error);
+                      }
                     }
                   }}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm shadow-lg"
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm shadow-lg transition-colors"
                   title="Enable remote video"
                 >
                   <svg className="w-5 h-5 inline mr-1" fill="currentColor" viewBox="0 0 24 24">

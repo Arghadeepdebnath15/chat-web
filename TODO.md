@@ -29,6 +29,9 @@
 - [x] Simplify autoplay handling for both local and remote videos
 - [x] Add better user interaction prompts
 - [x] Ensure videos play on both desktop and mobile
+- [x] Fix autoplay interruption errors during call cleanup
+- [x] Add safeguards against multiple play attempts
+- [x] Improve video element state management
 
 ### 5. Fix State Management
 - [x] Align VideoCall component state with ChatContext
