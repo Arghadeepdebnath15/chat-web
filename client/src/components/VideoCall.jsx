@@ -79,6 +79,7 @@ const VideoCall = ({ onClose }) => {
 
     // Listen for answer
     socket.on("webrtc-answer", async ({ answer }) => {
+      console.log("Received webrtc-answer", answer);
       if (peerConnectionRef.current) {
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       }
@@ -86,6 +87,7 @@ const VideoCall = ({ onClose }) => {
 
     // Listen for offer
     socket.on("webrtc-offer", async ({ from, offer }) => {
+      console.log("Received webrtc-offer from", from, offer);
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (localVideoRef.current) {
