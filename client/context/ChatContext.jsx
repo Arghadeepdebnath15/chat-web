@@ -13,6 +13,7 @@ export const ChatProvider = ({ children })=>{
     const [unseenMessages, setUnseenMessages] = useState({})
     const [showRightSidebar, setShowRightSidebar] = useState(false)
     const [typingUsers, setTypingUsers] = useState({}) // { userId: true }
+    const [isCurrentUserTyping, setIsCurrentUserTyping] = useState(false)
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [incomingCall, setIncomingCall] = useState(null);
 
@@ -126,13 +127,20 @@ export const ChatProvider = ({ children })=>{
 
         // Typing indicator events
         socket.on("typing", ({ from }) => {
-            setTypingUsers(prev => ({ ...prev, [from]: true }));
+            console.log("Received typing event from:", from);
+            setTypingUsers(prev => {
+                const newTypingUsers = { ...prev, [from]: true };
+                console.log("Updated typingUsers:", newTypingUsers);
+                return newTypingUsers;
+            });
         });
 
         socket.on("stopTyping", ({ from }) => {
+            console.log("Received stopTyping event from:", from);
             setTypingUsers(prev => {
                 const newTypingUsers = { ...prev };
                 delete newTypingUsers[from];
+                console.log("Updated typingUsers after stopTyping:", newTypingUsers);
                 return newTypingUsers;
             });
         });
@@ -153,15 +161,15 @@ export const ChatProvider = ({ children })=>{
 
     // function to send typing event
     const sendTyping = () => {
-        if(socket && selectedUser) {
-            socket.emit("typing", { to: selectedUser._id });
+        if(socket && selectedUser && authUser) {
+            socket.emit("typing", { to: selectedUser._id, from: authUser._id });
         }
     }
 
     // function to send stop typing event
     const stopTyping = () => {
-        if(socket && selectedUser) {
-            socket.emit("stopTyping", { to: selectedUser._id });
+        if(socket && selectedUser && authUser) {
+            socket.emit("stopTyping", { to: selectedUser._id, from: authUser._id });
         }
     }
 

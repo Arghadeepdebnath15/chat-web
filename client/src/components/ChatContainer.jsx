@@ -190,7 +190,10 @@ const ChatContainer = () => {
             />
         </div>
         {selectedUser && typingUsers[selectedUser._id] && (
-          <p className="absolute bottom-16 left-4 text-xs text-gray-300 italic ml-2 bg-black bg-opacity-50 px-2 py-1 rounded-md z-20">Typing...</p>
+          <p className="absolute bottom-16 left-4 text-xs text-gray-300 italic ml-2 bg-black bg-opacity-50 px-2 py-1 rounded-md z-20">
+            {console.log("Typing indicator should show for user:", selectedUser._id, "typingUsers:", typingUsers)}
+            Typing...
+          </p>
         )}
     </div>
 
