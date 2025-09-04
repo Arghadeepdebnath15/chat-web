@@ -182,6 +182,7 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
 
         peerConnectionRef.current.ontrack = (event) => {
           if (remoteVideoRef.current) {
+            // Set remote video to the stream of the other user
             remoteVideoRef.current.srcObject = event.streams[0];
           }
           setCallingState('connected');
