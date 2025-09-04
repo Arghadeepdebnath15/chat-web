@@ -10,8 +10,8 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
   const [showAcceptPopup, setShowAcceptPopup] = useState(isIncoming);
   const [callingState, setCallingState] = useState(isIncoming ? 'incoming' : 'calling');
   const [pendingOffer, setPendingOffer] = useState(null);
-  const [hasAccepted, setHasAccepted] = useState(false);
-  const [popupShown, setPopupShown] = useState(false);
+  const hasAcceptedRef = useRef(false);
+  const popupShownRef = useRef(false);
 
   const configuration = {
     iceServers: [
@@ -90,11 +90,11 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
     // Listen for offer
     socket.on("webrtc-offer", async ({ from, offer }) => {
       console.log("Received webrtc-offer from", from, offer);
-      if (!hasAccepted && !popupShown) {
+      if (!hasAcceptedRef.current && !popupShownRef.current) {
         setPendingOffer(offer);
         setCallingState('incoming');
         setShowAcceptPopup(true);
-        setPopupShown(true);
+        popupShownRef.current = true;
       }
     });
 
@@ -112,10 +112,10 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
     // Listen for call invitation
     socket.on("webrtc-call-invitation", ({ from }) => {
       console.log("Received webrtc-call-invitation from", from);
-      if (!hasAccepted && !popupShown) {
+      if (!hasAcceptedRef.current && !popupShownRef.current) {
         setCallingState('incoming');
         setShowAcceptPopup(true);
-        setPopupShown(true);
+        popupShownRef.current = true;
       }
     });
 
@@ -171,8 +171,8 @@ export default function VideoCall({ onClose, isIncoming = false, caller = null }
   }, [socket, selectedUser]);
 
   const handleAccept = async () => {
-    if (hasAccepted) return; // Prevent multiple accepts
-    setHasAccepted(true);
+    if (hasAcceptedRef.current) return; // Prevent multiple accepts
+    hasAcceptedRef.current = true;
     setShowAcceptPopup(false);
     setCallingState('connecting');
     socket.emit("webrtc-accept", { to: selectedUser._id });
