@@ -14,6 +14,7 @@ export const ChatProvider = ({ children })=>{
     const [showRightSidebar, setShowRightSidebar] = useState(false)
     const [typingUsers, setTypingUsers] = useState({}) // { userId: true }
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [incomingCall, setIncomingCall] = useState(null);
 
     // Persist selectedUser in localStorage
     useEffect(() => {
@@ -135,6 +136,11 @@ export const ChatProvider = ({ children })=>{
                 return newTypingUsers;
             });
         });
+
+        // Video call events
+        socket.on("webrtc-call-invitation", ({ from }) => {
+            setIncomingCall({ from });
+        });
     }
 
     // function to send typing event
@@ -182,7 +188,7 @@ export const ChatProvider = ({ children })=>{
     const value = {
         messages, users, selectedUser, getUsers, searchUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
         showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages,
-        socket
+        socket, incomingCall, setIncomingCall
     }
 
     return (

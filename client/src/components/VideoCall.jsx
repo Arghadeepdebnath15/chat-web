@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
 import { ChatContext } from "../../context/ChatContext";
 
-const VideoCall = ({ onClose }) => {
+const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const { socket, selectedUser, authUser } = useContext(ChatContext);
   const [callActive, setCallActive] = useState(false);
+  const [showAcceptPopup, setShowAcceptPopup] = useState(isIncoming);
+  const [callingState, setCallingState] = useState(isIncoming ? 'incoming' : 'calling');
+  const [pendingOffer, setPendingOffer] = useState(null);
 
   const configuration = {
     iceServers: [
@@ -19,22 +22,14 @@ const VideoCall = ({ onClose }) => {
     if (!socket || !selectedUser) return;
 
     let localStream;
+    let callAccepted = false;
+    let incomingOffer = null;
 
     const startCall = async () => {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
-        }
-        // Check if audio track is enabled
-        const audioTracks = localStream.getAudioTracks();
-        if (audioTracks.length === 0) {
-          console.warn("No audio tracks found in local stream");
-        } else {
-          console.log("Audio tracks found:", audioTracks);
-          audioTracks.forEach(track => {
-            console.log(`Track kind: ${track.kind}, enabled: ${track.enabled}`);
-          });
         }
 
         peerConnectionRef.current = new RTCPeerConnection(configuration);
@@ -88,47 +83,9 @@ const VideoCall = ({ onClose }) => {
     // Listen for offer
     socket.on("webrtc-offer", async ({ from, offer }) => {
       console.log("Received webrtc-offer from", from, offer);
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-        }
-
-        peerConnectionRef.current = new RTCPeerConnection(configuration);
-
-        localStream.getTracks().forEach((track) => {
-          peerConnectionRef.current.addTrack(track, localStream);
-        });
-
-        peerConnectionRef.current.ontrack = (event) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        };
-
-        peerConnectionRef.current.onicecandidate = (event) => {
-          if (event.candidate) {
-            socket.emit("webrtc-candidate", {
-              to: from,
-              candidate: event.candidate,
-            });
-          }
-        };
-
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await peerConnectionRef.current.createAnswer();
-        await peerConnectionRef.current.setLocalDescription(answer);
-
-        socket.emit("webrtc-answer", {
-          to: from,
-          answer,
-        });
-
-        setCallActive(true);
-      } catch (error) {
-        console.error("Error handling offer:", error);
-        onClose();
-      }
+      setPendingOffer(offer);
+      setCallingState('incoming');
+      setShowAcceptPopup(true);
     });
 
     // Listen for ICE candidates
@@ -142,13 +99,37 @@ const VideoCall = ({ onClose }) => {
       }
     });
 
+    // Listen for call invitation
+    socket.on("webrtc-call-invitation", ({ from }) => {
+      console.log("Received webrtc-call-invitation from", from);
+      setCallingState('incoming');
+      setShowAcceptPopup(true);
+    });
+
+    // Listen for accept
+    socket.on("webrtc-accept", async () => {
+      console.log("Call accepted");
+      setCallingState('connecting');
+      await startCall();
+    });
+
+    // Listen for decline
+    socket.on("webrtc-decline", () => {
+      console.log("Call declined");
+      setCallingState('declined');
+      setTimeout(() => onClose(), 2000);
+    });
+
     // Listen for call end
     socket.on("webrtc-call-ended", () => {
       endCall();
     });
 
     // Start call if this user initiated it
-    startCall();
+    if (!isIncoming) {
+      socket.emit("webrtc-call-invitation", { to: selectedUser._id });
+      setCallingState('calling');
+    }
 
     const endCall = () => {
       if (peerConnectionRef.current) {
@@ -176,6 +157,63 @@ const VideoCall = ({ onClose }) => {
     };
   }, [socket, selectedUser]);
 
+  const handleAccept = async () => {
+    setShowAcceptPopup(false);
+    setCallingState('connecting');
+    socket.emit("webrtc-accept", { to: selectedUser._id });
+    // Wait for offer, but since offer is already received, handle it
+    if (pendingOffer) {
+      try {
+        const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+
+        peerConnectionRef.current = new RTCPeerConnection(configuration);
+
+        localStream.getTracks().forEach((track) => {
+          peerConnectionRef.current.addTrack(track, localStream);
+        });
+
+        peerConnectionRef.current.ontrack = (event) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
+          setCallingState('connected');
+        };
+
+        peerConnectionRef.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("webrtc-candidate", {
+              to: selectedUser._id,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+        const answer = await peerConnectionRef.current.createAnswer();
+        await peerConnectionRef.current.setLocalDescription(answer);
+
+        socket.emit("webrtc-answer", {
+          to: selectedUser._id,
+          answer,
+        });
+
+        setCallActive(true);
+        setCallingState('connected');
+      } catch (error) {
+        console.error("Error accepting call:", error);
+        onClose();
+      }
+    }
+  };
+
+  const handleDecline = () => {
+    socket.emit("webrtc-decline", { to: selectedUser._id });
+    onClose();
+  };
+
   const handleHangup = () => {
     if (socket && selectedUser) {
       socket.emit("webrtc-call-ended", { to: selectedUser._id });
@@ -198,6 +236,22 @@ const VideoCall = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50 p-4">
+      {showAcceptPopup && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+            <h2 className="text-xl font-bold mb-4">Incoming Video Call</h2>
+            <p className="mb-4">From: {selectedUser?.fullName}</p>
+            <div className="flex gap-4">
+              <button onClick={handleAccept} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
+                Accept
+              </button>
+              <button onClick={handleDecline} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition">
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex gap-4 mb-4">
         <div>
           <p className="text-white text-center mb-2">You</p>
@@ -208,6 +262,13 @@ const VideoCall = ({ onClose }) => {
           <video ref={remoteVideoRef} autoPlay playsInline className="w-48 h-36 rounded-md bg-black" />
         </div>
       </div>
+      <div className="text-white text-center mb-4">
+        {callingState === 'calling' && <p>Calling...</p>}
+        {callingState === 'ringing' && <p>Ringing...</p>}
+        {callingState === 'connecting' && <p>Connecting...</p>}
+        {callingState === 'connected' && <p>Connected</p>}
+        {callingState === 'declined' && <p>Call declined</p>}
+      </div>
       <button onClick={handleHangup} className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition">
         Hang Up
       </button>
@@ -215,4 +276,3 @@ const VideoCall = ({ onClose }) => {
   );
 };
 
-export default VideoCall;

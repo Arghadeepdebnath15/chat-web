@@ -9,7 +9,7 @@ import VideoCall from './VideoCall'
 const ChatContainer = () => {
 
     const { messages, selectedUser, setSelectedUser, sendMessage,
-        getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages } = useContext(ChatContext)
+        getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages, incomingCall, setIncomingCall } = useContext(ChatContext)
 
     const { authUser, onlineUsers } = useContext(AuthContext)
 
@@ -56,6 +56,13 @@ const ChatContainer = () => {
             scrollEnd.current.scrollIntoView({ behavior: "smooth"})
         }
     },[messages])
+
+    useEffect(() => {
+        if (incomingCall) {
+            setShowVideoCall(true);
+            setIncomingCall(null); // Clear after showing
+        }
+    }, [incomingCall, setIncomingCall])
 
   return selectedUser ? (
     <div className='h-full overflow-scroll relative backdrop-blur-lg'>
