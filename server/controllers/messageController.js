@@ -70,7 +70,16 @@ export const getMessages = async (req, res) =>{
                 {senderId: selectedUserId, receiverId: myId},
             ]
         })
-        await Message.updateMany({senderId: selectedUserId, receiverId: myId}, {seen: true});
+        const updated = await Message.updateMany({senderId: selectedUserId, receiverId: myId, seen: false}, {seen: true});
+        if (updated.modifiedCount > 0) {
+            // Emit messagesSeen event to sender's socket with list of updated message IDs
+            const updatedMessages = await Message.find({senderId: selectedUserId, receiverId: myId, seen: true});
+            const senderSocketId = userSocketMap[selectedUserId];
+            if (senderSocketId) {
+                const seenMessageIds = updatedMessages.map(msg => msg._id.toString());
+                io.to(senderSocketId).emit("messagesSeen", seenMessageIds);
+            }
+        }
 
         res.json({success: true, messages})
 
@@ -82,10 +91,15 @@ export const getMessages = async (req, res) =>{
 }
 
 // api to mark message as seen using message id
-export const markMessageAsSeen = async (req, res)=>{
+export const markMessageAsSeen = async (req, res)=> {
     try {
         const { id } = req.params;
-        await Message.findByIdAndUpdate(id, {seen: true})
+        const updatedMessage = await Message.findByIdAndUpdate(id, {seen: true}, {new: true});
+        // Emit messageSeen event to sender's socket
+        const senderSocketId = userSocketMap[updatedMessage.senderId];
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messageSeen", updatedMessage._id.toString());
+        }
         res.json({success: true})
     } catch (error) {
         console.log(error.message);

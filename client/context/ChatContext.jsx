@@ -99,11 +99,29 @@ export const ChatProvider = ({ children })=>{
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
             }else{
-                setUnseenMessages((prevUnseenMessages)=>({
+                setUnseenMessages((prevUnseenMessages)=>( {
                     ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
                 }))
             }
         })
+
+        // Listen for messageSeen event to update single message seen status
+        socket.on("messageSeen", (messageId) => {
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg._id === messageId ? { ...msg, seen: true } : msg
+                )
+            );
+        });
+
+        // Listen for messagesSeen event to update multiple messages seen status
+        socket.on("messagesSeen", (messageIds) => {
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    messageIds.includes(msg._id) ? { ...msg, seen: true } : msg
+                )
+            );
+        });
 
         // Typing indicator events
         socket.on("typing", ({ from }) => {
