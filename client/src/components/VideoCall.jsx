@@ -30,25 +30,31 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       { urls: "stun:stun3.l.google.com:19302" },
       { urls: "stun:stun4.l.google.com:19302" },
 
-      // Reliable TURN servers (updated with working credentials)
-      {
-        urls: [
-          "turn:turn.bistri.com:80",
-          "turn:turn.anyfirewall.com:443"
-        ],
-        username: "webrtc",
-        credential: "webrtc"
-      },
-      {
-        urls: "turn:numb.viagenie.ca",
-        credential: "muazkh",
-        username: "webrtc@live.com"
-      },
-      // Fallback TURN server
+      // Working TURN servers (updated with reliable public servers)
       {
         urls: "turn:openrelay.metered.ca:80",
         username: "openrelayproject",
         credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      // Additional reliable TURN servers
+      {
+        urls: [
+          "turn:relay.metered.ca:80",
+          "turn:relay.metered.ca:443",
+          "turn:relay.metered.ca:443?transport=tcp"
+        ],
+        username: "free",
+        credential: "free"
       }
     ],
     iceCandidatePoolSize: 10,
@@ -59,309 +65,100 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // Initialize WebRTC peer connection with enhanced configuration
   const createPeerConnection = () => {
-    // Add codec preferences for better compatibility
     const pc = new RTCPeerConnection(rtcConfiguration);
-
-    // Set codec preferences if supported
-    if (RTCRtpTransceiver && pc.addTransceiver) {
-      try {
-        // Prefer VP8 codec for better compatibility
-        const transceiver = pc.addTransceiver('video', { direction: 'recvonly' });
-        if (transceiver.setCodecPreferences) {
-          const codecs = RTCRtpReceiver.getCapabilities('video')?.codecs;
-          if (codecs) {
-            const vp8Codec = codecs.find(codec => codec.mimeType === 'video/VP8');
-            const h264Codec = codecs.find(codec => codec.mimeType === 'video/H264');
-            if (vp8Codec) {
-              transceiver.setCodecPreferences([vp8Codec, ...codecs.filter(c => c !== vp8Codec)]);
-            } else if (h264Codec) {
-              transceiver.setCodecPreferences([h264Codec, ...codecs.filter(c => c !== h264Codec)]);
-            }
-          }
-        }
-      } catch (codecError) {
-        console.warn("Codec preference setting failed:", codecError);
-      }
-    }
 
     peerConnectionRef.current = pc;
 
-    // Handle ICE candidates
-    peerConnectionRef.current.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("Sending ICE candidate:", event.candidate.type);
         socket.emit("webrtc-candidate", {
           to: selectedUser._id,
           candidate: event.candidate,
         });
-      } else {
-        console.log("ICE candidate gathering completed");
       }
     };
 
-    // Handle ICE connection state changes with retry logic
-    peerConnectionRef.current.oniceconnectionstatechange = () => {
-      console.log("ICE connection state:", peerConnectionRef.current.iceConnectionState);
-      if (peerConnectionRef.current.iceConnectionState === 'connected') {
-        console.log("ICE connection established");
-        setCallState('connected');
-      } else if (peerConnectionRef.current.iceConnectionState === 'failed') {
-        console.error("ICE connection failed - attempting TURN server fallback");
-
-        // Try to restart ICE with different servers
-        if (peerConnectionRef.current && peerConnectionRef.current.restartIce) {
-          console.log("Restarting ICE with alternative servers");
-          peerConnectionRef.current.restartIce();
-        } else {
-          console.log("ICE restart not supported, connection failed");
-          setCallState('failed');
-          setTimeout(() => onClose(), 3000);
-        }
-      } else if (peerConnectionRef.current.iceConnectionState === 'disconnected') {
-        console.warn("ICE connection disconnected - attempting to reconnect");
-        // Don't immediately fail, give it time to reconnect
-      }
-    };
-
-    // Handle connection state changes with quality tracking
-    peerConnectionRef.current.onconnectionstatechange = () => {
-      console.log("Peer connection state:", peerConnectionRef.current.connectionState);
-      if (peerConnectionRef.current.connectionState === 'connected') {
-        console.log("Peer connection fully established");
-        setCallState('connected');
-        setConnectionQuality('good');
-        setConnectionAttempts(prev => prev + 1);
-      } else if (peerConnectionRef.current.connectionState === 'failed') {
-        console.error("Peer connection failed");
-        setCallState('failed');
-        setConnectionQuality('failed');
-        setTimeout(() => onClose(), 3000);
-      } else if (peerConnectionRef.current.connectionState === 'disconnected') {
-        console.warn("Peer connection disconnected");
-        setConnectionQuality('poor');
-      } else if (peerConnectionRef.current.connectionState === 'connecting') {
-        setConnectionQuality('connecting');
-      }
-    };
-
-    // Handle ICE gathering state changes
-    peerConnectionRef.current.onicegatheringstatechange = () => {
-      console.log("ICE gathering state:", peerConnectionRef.current.iceGatheringState);
-    };
-
-    // Handle remote stream with device-specific handling
-    peerConnectionRef.current.ontrack = (event) => {
-      console.log("Received remote stream");
-      if (remoteVideoRef.current && event.streams[0]) {
-        console.log("Remote stream tracks:", event.streams[0].getTracks().map(track => ({
-          kind: track.kind,
-          enabled: track.enabled,
-          readyState: track.readyState
-        })));
-
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
         setRemoteVideoLoading(false);
         setCallState('connected');
 
-        // Check if we're on a mobile device
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        // Ensure remote video plays with device-specific handling
-        remoteVideoRef.current.onloadedmetadata = async () => {
-          console.log("Remote video metadata loaded");
-          try {
-            await remoteVideoRef.current.play();
+        // Try to play the video, handle autoplay restrictions
+        const playPromise = remoteVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
             console.log("Remote video playing successfully");
-          } catch (playError) {
-            console.error("Error playing remote video:", playError);
-
-            // On desktop browsers, autoplay might be blocked
-            if (!isMobile) {
-              console.log("Desktop browser detected, attempting user interaction for remote video");
-
-              // Try to play again after a short delay
-              setTimeout(async () => {
-                try {
-                  await remoteVideoRef.current.play();
-                  console.log("Remote video played after delay");
-                } catch (delayError) {
-                  console.error("Failed to play remote video after delay:", delayError);
-
-                  // Create a user interaction prompt for desktop
-                  const playButton = document.createElement('button');
-                  playButton.innerText = 'Click to Enable Remote Video';
-                  playButton.style.cssText = `
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    z-index: 1000;
-                    padding: 10px 20px;
-                    background: #007bff;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 14px;
-                  `;
-
-                  const remoteVideoContainer = remoteVideoRef.current.parentElement;
-                  remoteVideoContainer.style.position = 'relative';
-                  remoteVideoContainer.appendChild(playButton);
-
-                  playButton.onclick = async () => {
-                    try {
-                      await remoteVideoRef.current.play();
-                      console.log("Remote video played after user interaction");
-                      playButton.remove();
-                    } catch (interactionError) {
-                      console.error("Failed to play remote video after user interaction:", interactionError);
-                      alert("Unable to play remote video. Please check your browser settings and try refreshing the page.");
-                    }
-                  };
-
-                  // Auto-remove button after 10 seconds
-                  setTimeout(() => {
-                    if (playButton.parentElement) {
-                      playButton.remove();
-                    }
-                  }, 10000);
-                }
-              }, 1000);
-            } else {
-              // On mobile, try alternative approaches
-              console.log("Mobile device detected, trying alternative playback methods");
-
-              // Force play with user gesture simulation
-              const playPromise = remoteVideoRef.current.play();
-              if (playPromise !== undefined) {
-                playPromise.then(() => {
-                  console.log("Remote video played on mobile");
-                }).catch((mobileError) => {
-                  console.error("Failed to play remote video on mobile:", mobileError);
-                });
-              }
-            }
-          }
-        };
-
-        // Monitor remote stream health
-        event.streams[0].getTracks().forEach(track => {
-          console.log(`Remote ${track.kind} track state:`, track.readyState);
-          track.onended = () => console.log(`Remote ${track.kind} track ended`);
-          track.onmute = () => console.log(`Remote ${track.kind} track muted`);
-          track.onunmute = () => console.log(`Remote ${track.kind} track unmuted`);
-        });
-      } else {
-        console.warn("Remote video element not ready or no stream received");
+          }).catch(error => {
+            console.log("Autoplay blocked for remote video:", error);
+            // Show user interaction prompt
+            setCallState('autoplay-blocked');
+          });
+        }
       }
     };
 
-    return peerConnectionRef.current;
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'connected') {
+        setCallState('connected');
+      } else if (pc.iceConnectionState === 'failed') {
+        setCallState('failed');
+        setTimeout(() => onClose(), 3000);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        setCallState('connected');
+        setConnectionQuality('good');
+      } else if (pc.connectionState === 'failed') {
+        setCallState('failed');
+        setConnectionQuality('failed');
+        setTimeout(() => onClose(), 3000);
+      } else if (pc.connectionState === 'disconnected') {
+        setConnectionQuality('poor');
+      } else if (pc.connectionState === 'connecting') {
+        setConnectionQuality('connecting');
+      }
+    };
+
+    return pc;
   };
 
   // Get user media with device-specific optimizations
   const getUserMedia = async () => {
     try {
-      console.log("Requesting camera and microphone permissions...");
-
-      // Check if we're on a mobile device
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      console.log("Device type:", isMobile ? "Mobile" : "Desktop");
-
-      // Configure constraints based on device type
       const constraints = {
-        video: {
-          width: { ideal: isMobile ? 640 : 1280 },
-          height: { ideal: isMobile ? 480 : 720 },
-          frameRate: { ideal: 30 },
-          facingMode: isMobile ? "user" : undefined // Use front camera on mobile
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        video: true,
+        audio: true
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log("Permissions granted, local stream obtained");
       localStreamRef.current = stream;
 
-      // Ensure local video element is ready and set the stream
       if (localVideoRef.current) {
-        console.log("Setting local video srcObject");
         localVideoRef.current.srcObject = stream;
 
-        // Add event listener to ensure video is loaded
-        localVideoRef.current.onloadedmetadata = async () => {
-          console.log("Local video metadata loaded");
-          try {
-            await localVideoRef.current.play();
+        // Try to play the local video
+        const playPromise = localVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
             console.log("Local video playing successfully");
             setLocalVideoLoading(false);
-          } catch (playError) {
-            console.error("Error playing local video:", playError);
-            // Try to play again after user interaction
-            const playPromise = localVideoRef.current.play();
-            if (playPromise !== undefined) {
-              playPromise.then(() => {
-                console.log("Local video playing after retry");
-                setLocalVideoLoading(false);
-              }).catch((retryError) => {
-                console.error("Failed to play local video after retry:", retryError);
-                setLocalVideoLoading(false);
-              });
-            }
-          }
-        };
-
-        // Force play in case autoplay is blocked (especially on desktop)
-        setTimeout(async () => {
-          if (localVideoRef.current && localVideoRef.current.paused) {
-            console.log("Attempting to force play local video");
-            try {
-              await localVideoRef.current.play();
-              console.log("Local video force-played successfully");
-            } catch (forceError) {
-              console.error("Failed to force-play local video:", forceError);
-              // On desktop, this might require user interaction
-              if (!isMobile) {
-                alert("Please click anywhere on the page to enable video playback.");
-                const handleUserInteraction = async () => {
-                  try {
-                    await localVideoRef.current.play();
-                    console.log("Local video played after user interaction");
-                    setLocalVideoLoading(false);
-                  } catch (interactionError) {
-                    console.error("Failed to play after user interaction:", interactionError);
-                  }
-                  document.removeEventListener('click', handleUserInteraction);
-                  document.removeEventListener('touchstart', handleUserInteraction);
-                };
-                document.addEventListener('click', handleUserInteraction);
-                document.addEventListener('touchstart', handleUserInteraction);
-              }
-            }
-          }
+          }).catch(error => {
+            console.log("Autoplay blocked for local video:", error);
+            setLocalVideoLoading(false);
+            // For local video, we can show a play button
+            setCallState('local-autoplay-blocked');
+          });
+        } else {
           setLocalVideoLoading(false);
-        }, 500);
-      } else {
-        console.warn("Local video element not ready");
+        }
       }
 
       return stream;
     } catch (error) {
-      console.error("Error accessing media devices:", error);
-      if (error.name === 'NotAllowedError') {
-        alert("Camera and microphone access denied. Please allow permissions and refresh the page to make video calls.");
-      } else if (error.name === 'NotFoundError') {
-        alert("No camera or microphone found. Please connect a camera and microphone.");
-      } else if (error.name === 'NotReadableError') {
-        alert("Camera or microphone is already in use by another application.");
-      } else {
-        alert("Error accessing camera and microphone: " + error.message);
-      }
+      alert("Error accessing camera and microphone: " + error.message);
       onClose();
       return null;
     }
@@ -369,7 +166,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // Start outgoing call
   const startCall = async () => {
-    console.log("Starting call process...");
     setCallState('calling');
 
     const stream = await getUserMedia();
@@ -379,22 +175,16 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
-      console.log("Creating WebRTC offer...");
       const offer = await pc.createOffer();
-      console.log("Offer created:", offer);
       await pc.setLocalDescription(offer);
-      console.log("Local description set");
 
-      console.log("Sending offer to server for user:", selectedUser._id);
       socket.emit("webrtc-offer", {
         to: selectedUser._id,
         offer,
       });
-      console.log("Offer sent to server");
 
       setCallState('ringing');
     } catch (error) {
-      console.error("Error creating offer:", error);
       setCallState('failed');
       onClose();
     }
@@ -402,7 +192,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // Accept incoming call
   const acceptCall = async () => {
-    console.log("Accepting call...");
     setShowAcceptPopup(false);
     setCallState('connecting');
 
@@ -413,19 +202,20 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
-      console.log("Setting remote description...");
       if (!pendingOfferRef.current) {
-        console.error("No pending offer available!");
         setCallState('failed');
         onClose();
         return;
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
-      console.log("Remote description set");
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+
+      socket.emit("webrtc-accept", {
+        to: selectedUser._id,
+      });
 
       socket.emit("webrtc-answer", {
         to: selectedUser._id,
@@ -434,7 +224,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
       setCallState('connected');
     } catch (error) {
-      console.error("Error accepting call:", error);
       setCallState('failed');
       onClose();
     }
@@ -448,26 +237,48 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
 
   // End call
   const endCall = () => {
+    console.log("Ending call and cleaning up resources");
+
+    // Close peer connection
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
 
+    // Stop local stream tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         track.stop();
+        console.log("Stopped local track:", track.kind);
       });
       localStreamRef.current = null;
     }
 
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-      remoteVideoRef.current.srcObject.getTracks().forEach(track => {
-        track.stop();
-      });
-      remoteVideoRef.current.srcObject = null;
+    // Clear remote video
+    if (remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject) {
+        remoteVideoRef.current.srcObject.getTracks().forEach(track => {
+          track.stop();
+          console.log("Stopped remote track:", track.kind);
+        });
+        remoteVideoRef.current.srcObject = null;
+      }
     }
 
+    // Reset all states
+    setCallState('idle');
+    setIsMuted(false);
+    setIsVideoOff(false);
+    setLocalVideoLoading(true);
+    setRemoteVideoLoading(true);
+    setPendingOffer(null);
+    setConnectionQuality('unknown');
+    setConnectionAttempts(0);
+
+    // Notify other peer
     socket.emit("webrtc-call-ended", { to: selectedUser._id });
+
+    // Close the component
     onClose();
   };
 
@@ -475,9 +286,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const toggleMute = () => {
     if (localStreamRef.current) {
       const audioTracks = localStreamRef.current.getAudioTracks();
-      audioTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
+      audioTracks.forEach(track => (track.enabled = !track.enabled));
       setIsMuted(!isMuted);
     }
   };
@@ -486,9 +295,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const toggleVideo = () => {
     if (localStreamRef.current) {
       const videoTracks = localStreamRef.current.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
+      videoTracks.forEach(track => (track.enabled = !track.enabled));
       setIsVideoOff(!isVideoOff);
     }
   };
@@ -558,10 +365,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   useEffect(() => {
     if (!socket || !selectedUser) return;
 
-    console.log("Setting up socket listeners for video call");
-
     const handleOffer = ({ from, offer }) => {
-      console.log("Received WebRTC offer from:", from);
       setPendingOffer(offer);
       pendingOfferRef.current = offer;
       setCallState('incoming');
@@ -569,7 +373,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     const handleAnswer = async ({ answer }) => {
-      console.log("Received answer");
       if (peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
@@ -580,7 +383,6 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     const handleIceCandidate = async ({ candidate }) => {
-      console.log("Received ICE candidate");
       if (peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
@@ -591,30 +393,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
     };
 
     const handleCallEnded = () => {
-      console.log("Call ended by other party");
       endCall();
     };
 
-    // Register event listeners
     socket.on("webrtc-offer", handleOffer);
     socket.on("webrtc-answer", handleAnswer);
     socket.on("webrtc-candidate", handleIceCandidate);
     socket.on("webrtc-call-ended", handleCallEnded);
 
-    // Start call if outgoing
     if (!isIncoming) {
-      console.log("Starting outgoing call to:", selectedUser._id);
       socket.emit("webrtc-call-invitation", { to: selectedUser._id });
       setCallState('calling');
     }
 
-    // Cleanup
     return () => {
       socket.off("webrtc-offer", handleOffer);
       socket.off("webrtc-answer", handleAnswer);
       socket.off("webrtc-candidate", handleIceCandidate);
       socket.off("webrtc-call-ended", handleCallEnded);
-      endCall();
+      // Only end call if component is unmounting, not just when useEffect re-runs
+      if (!isIncoming) {
+        endCall();
+      }
     };
   }, [socket, selectedUser, isIncoming]);
 
@@ -685,6 +485,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
                 </div>
               </div>
             )}
+            {callState === 'local-autoplay-blocked' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      if (localVideoRef.current) {
+                        localVideoRef.current.play().then(() => {
+                          setCallState('connected');
+                        }).catch(console.error);
+                      }
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2"
+                  >
+                    <svg className="w-6 h-6 inline mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    Enable Camera
+                  </button>
+                  <p className="text-white text-sm">Click to enable your camera</p>
+                </div>
+              </div>
+            )}
             <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
               You {isMuted && "(Muted)"} {isVideoOff && "(Video Off)"}
             </div>
@@ -711,6 +533,28 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
               </div>
             )}
+            {callState === 'autoplay-blocked' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      if (remoteVideoRef.current) {
+                        remoteVideoRef.current.play().then(() => {
+                          setCallState('connected');
+                        }).catch(console.error);
+                      }
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg mb-2"
+                  >
+                    <svg className="w-6 h-6 inline mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    Enable Remote Video
+                  </button>
+                  <p className="text-white text-sm">Click to enable remote video</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -724,6 +568,8 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
           {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
           {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
           {callState === 'incoming' && <p className="text-lg">Incoming call...</p>}
+          {callState === 'autoplay-blocked' && <p className="text-lg text-yellow-400">Click to enable remote video</p>}
+          {callState === 'local-autoplay-blocked' && <p className="text-lg text-yellow-400">Click to enable camera</p>}
 
           {/* Connection Quality Indicator */}
           {callState === 'connected' && (

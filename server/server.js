@@ -100,14 +100,14 @@ io.on("connection",(socket)=>{
     socket.on("webrtc-accept", (data) => {
         const toSocketId = userSocketMap[data.to];
         if (toSocketId) {
-            socket.to(toSocketId).emit("webrtc-accept");
+            socket.to(toSocketId).emit("webrtc-call-accept");
         }
     });
 
     socket.on("webrtc-decline", (data) => {
         const toSocketId = userSocketMap[data.to];
         if (toSocketId) {
-            socket.to(toSocketId).emit("webrtc-decline");
+            socket.to(toSocketId).emit("webrtc-call-decline");
         }
     });
 

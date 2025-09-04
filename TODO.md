@@ -1,31 +1,43 @@
-# Video Call Accept Popup Implementation
+# Video Calling Feature Fixes
 
-## Tasks
-- [x] Modify VideoCall.jsx to add accept/decline popup for incoming calls
-- [x] Add new socket events: webrtc-call-invitation, webrtc-accept, webrtc-decline
-- [x] Update WebRTC flow: invitation -> accept -> offer/answer -> connect
-- [x] Add calling states: calling, ringing, connected
-- [x] Handle decline: close call and notify other party
-- [x] Fix popup reappearance after accept
-- [x] Synchronize connections/disconnections
-- [x] Optimize video calling feature
-- [x] Test the flow: initiate call, receive popup, accept/decline
+## Issues Identified
+- Event name inconsistencies between client and server
+- Signaling flow problems with invitation/offer handling
+- Outdated TURN servers causing connection failures
+- Complex autoplay handling failing on some browsers
+- State management conflicts
 
-## Current Status
-- VideoCall component completely rewritten with robust WebRTC implementation
-- Accept/decline popup implemented with proper UI
-- WebRTC signaling working with offer/answer flow
-- Media stream handling with permissions and error handling
-- Call state management with proper transitions
-- Mute/unmute and video on/off controls
-- Resource cleanup on call end
-- Connection state monitoring and error handling
+## Tasks to Complete
 
-## Key Improvements Made:
-- Simplified state management with single callState
-- Synchronous offer storage using ref object
-- Better error handling and user feedback
-- Clean UI with proper modal for accept/decline
-- Robust WebRTC peer connection setup
-- Proper media stream cleanup
-- Enhanced debugging and logging
+### 1. Fix Server-Side Event Names (server/server.js)
+- [x] Change "webrtc-accept" to "webrtc-call-accept"
+- [x] Change "webrtc-decline" to "webrtc-call-decline"
+- [x] Ensure all WebRTC events are properly forwarded
+
+### 2. Update Client-Side Signaling (client/src/components/VideoCall.jsx)
+- [x] Fix event emission for accept/decline to match server
+- [x] Simplify the call initiation flow
+- [x] Add proper handlers for call-accept and call-decline
+- [x] Improve error handling and connection states
+
+### 3. Update TURN Servers
+- [x] Replace outdated TURN servers with working public ones
+- [x] Add fallback STUN servers
+- [x] Test connectivity with different server combinations
+
+### 4. Improve Video Playback
+- [x] Simplify autoplay handling for both local and remote videos
+- [x] Add better user interaction prompts
+- [x] Ensure videos play on both desktop and mobile
+
+### 5. Fix State Management
+- [x] Align VideoCall component state with ChatContext
+- [x] Ensure proper cleanup on call end
+- [x] Handle incoming calls properly
+
+### 6. Testing
+- [ ] Test outgoing calls
+- [ ] Test incoming calls
+- [ ] Test call acceptance/decline
+- [ ] Test video display on both sides
+- [ ] Test on different browsers/devices
