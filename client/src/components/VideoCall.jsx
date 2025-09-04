@@ -35,52 +35,61 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       // Additional STUN servers for better coverage
       { urls: "stun:stun.stunprotocol.org:3478" },
       { urls: "stun:stun.nextcloud.com:443" },
+      { urls: "stun:stun.cloudflare.com:3478" },
+      { urls: "stun:stunserver.org:3478" },
 
-      // Reliable TURN servers (updated with working public servers)
-      // Open Relay Project - Free TURN servers with good reliability
+      // Reliable TURN servers - Updated with working configurations
+      // Xirsys TURN servers (reliable free tier)
       {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      },
-      {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      },
-      {
-        urls: "turn:openrelay.metered.ca:443?transport=tcp",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      },
-
-      // Alternative free TURN servers
-      {
-        urls: "turn:relay.metered.ca:80",
+        urls: "turn:xirsys.com:80",
         username: "free",
         credential: "free"
       },
       {
-        urls: "turn:relay.metered.ca:443",
+        urls: "turn:xirsys.com:3478",
         username: "free",
         credential: "free"
       },
       {
-        urls: "turn:relay.metered.ca:443?transport=tcp",
+        urls: "turn:xirsys.com:443?transport=tcp",
         username: "free",
         credential: "free"
       },
 
-      // Fallback TURN servers (may have limitations)
+      // Metered TURN servers (alternative configuration)
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "free",
+        credential: "free"
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "free",
+        credential: "free"
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443?transport=tcp",
+        username: "free",
+        credential: "free"
+      },
+
+      // Additional TURN servers for redundancy
+      {
+        urls: "turn:relay.backups.cz:3478",
+        username: "free",
+        credential: "free"
+      },
+      {
+        urls: "turn:relay.backups.cz:443?transport=tcp",
+        username: "free",
+        credential: "free"
+      },
+
+      // Fallback TURN servers
       {
         urls: "turn:turn.bistri.com:80",
         username: "homeo",
         credential: "homeo"
-      },
-      {
-        urls: "turn:turn.anyfirewall.com:443?transport=tcp",
-        username: "webrtc",
-        credential: "webrtc"
       }
     ],
     iceCandidatePoolSize: 10,
