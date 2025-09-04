@@ -1,291 +1,484 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
 import { ChatContext } from "../../context/ChatContext";
 
-export default function VideoCall({ onClose, isIncoming = false, caller = null }) {
+const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const localStreamRef = useRef(null);
   const { socket, selectedUser, authUser } = useContext(ChatContext);
-  const [callActive, setCallActive] = useState(false);
-  const [showAcceptPopup, setShowAcceptPopup] = useState(isIncoming);
-  const [callingState, setCallingState] = useState(isIncoming ? 'incoming' : 'calling');
-  const [pendingOffer, setPendingOffer] = useState(null);
-  const hasAcceptedRef = useRef(false);
-  const popupShownRef = useRef(false);
 
-  const configuration = {
+  const [callState, setCallState] = useState(isIncoming ? 'incoming' : 'idle');
+  const [showAcceptPopup, setShowAcceptPopup] = useState(isIncoming);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [pendingOffer, setPendingOffer] = useState(null);
+
+  // WebRTC Configuration with STUN/TURN servers
+  const rtcConfiguration = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      // Add TURN servers here if needed
+      {
+        urls: "turn:turn.anyfirewall.com:443?transport=tcp",
+        username: "webrtc",
+        credential: "webrtc"
+      },
+      {
+        urls: "turn:turn.anyfirewall.com:443?transport=udp",
+        username: "webrtc",
+        credential: "webrtc"
+      }
     ],
   };
 
-  useEffect(() => {
-    setShowAcceptPopup(isIncoming);
-    setCallingState(isIncoming ? 'incoming' : 'calling');
-  }, [isIncoming]);
+  // Initialize WebRTC peer connection
+  const createPeerConnection = () => {
+    peerConnectionRef.current = new RTCPeerConnection(rtcConfiguration);
 
-  useEffect(() => {
-    if (!socket || !selectedUser) return;
-
-    let localStream;
-    let callAccepted = false;
-    let incomingOffer = null;
-
-    const startCall = async () => {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-        }
-
-        peerConnectionRef.current = new RTCPeerConnection(configuration);
-
-        // Add local tracks to peer connection
-        localStream.getTracks().forEach((track) => {
-          peerConnectionRef.current.addTrack(track, localStream);
-        });
-
-        // Handle remote stream
-        peerConnectionRef.current.ontrack = (event) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        };
-
-        // Handle ICE candidates
-        peerConnectionRef.current.onicecandidate = (event) => {
-          if (event.candidate) {
-            socket.emit("webrtc-candidate", {
-              to: selectedUser._id,
-              candidate: event.candidate,
-            });
-          }
-        };
-
-        // Create offer
-        const offer = await peerConnectionRef.current.createOffer();
-        await peerConnectionRef.current.setLocalDescription(offer);
-
-        socket.emit("webrtc-offer", {
+    // Handle ICE candidates
+    peerConnectionRef.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("webrtc-candidate", {
           to: selectedUser._id,
-          offer,
+          candidate: event.candidate,
         });
-
-        setCallActive(true);
-      } catch (error) {
-        console.error("Error starting call:", error);
-        onClose();
       }
     };
 
-    // Listen for answer
-    socket.on("webrtc-answer", async ({ answer }) => {
-      console.log("Received webrtc-answer", answer);
-      if (peerConnectionRef.current) {
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+    // Handle connection state changes
+    peerConnectionRef.current.onconnectionstatechange = () => {
+      console.log("Connection state:", peerConnectionRef.current.connectionState);
+      if (peerConnectionRef.current.connectionState === 'connected') {
+        setCallState('connected');
+      } else if (peerConnectionRef.current.connectionState === 'failed') {
+        setCallState('failed');
+        setTimeout(() => onClose(), 3000);
       }
-    });
+    };
 
-    // Listen for offer
-    socket.on("webrtc-offer", async ({ from, offer }) => {
-      console.log("Received webrtc-offer from", from, offer);
-      if (!hasAcceptedRef.current && !popupShownRef.current) {
-        setPendingOffer(offer);
-        setCallingState('incoming');
-        setShowAcceptPopup(true);
-        popupShownRef.current = true;
+    // Handle remote stream
+    peerConnectionRef.current.ontrack = (event) => {
+      console.log("Received remote stream");
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+        setCallState('connected');
       }
-    });
+    };
 
-    // Listen for ICE candidates
-    socket.on("webrtc-candidate", async ({ candidate }) => {
-      try {
-        if (peerConnectionRef.current) {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-      } catch (error) {
-        console.error("Error adding received ICE candidate", error);
+    return peerConnectionRef.current;
+  };
+
+  // Get user media (camera and microphone)
+  const getUserMedia = async () => {
+    try {
+      console.log("=== GET USER MEDIA STARTED ===");
+      console.log("Requesting camera and microphone permissions...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      console.log("Permissions granted, local stream obtained");
+      console.log("Stream tracks:", stream.getTracks().map(track => ({ kind: track.kind, enabled: track.enabled })));
+
+      localStreamRef.current = stream;
+
+      if (localVideoRef.current) {
+        console.log("Setting local video srcObject");
+        localVideoRef.current.srcObject = stream;
+        console.log("Local video element:", localVideoRef.current);
+      } else {
+        console.log("Local video ref is null!");
       }
-    });
 
-    // Listen for call invitation
-    socket.on("webrtc-call-invitation", ({ from }) => {
-      console.log("Received webrtc-call-invitation from", from);
-      if (!hasAcceptedRef.current && !popupShownRef.current) {
-        setCallingState('incoming');
-        setShowAcceptPopup(true);
-        popupShownRef.current = true;
+      return stream;
+    } catch (error) {
+      console.error("=== ERROR ACCESSING MEDIA DEVICES ===", error);
+      if (error.name === 'NotAllowedError') {
+        alert("Camera and microphone access denied. Please allow permissions to make video calls.");
+      } else if (error.name === 'NotFoundError') {
+        alert("No camera or microphone found.");
+      } else {
+        alert("Error accessing camera and microphone: " + error.message);
       }
-    });
-
-    // Listen for accept
-    socket.on("webrtc-accept", async () => {
-      console.log("Call accepted");
-      setCallingState('connecting');
-      await startCall();
-    });
-
-    // Listen for decline
-    socket.on("webrtc-decline", () => {
-      console.log("Call declined");
-      setCallingState('declined');
-      setTimeout(() => onClose(), 2000);
-    });
-
-    // Listen for call end
-    socket.on("webrtc-call-ended", () => {
-      endCall();
-    });
-
-    // Start call if this user initiated it
-    if (!isIncoming) {
-      socket.emit("webrtc-call-invitation", { to: selectedUser._id });
-      setCallingState('calling');
-    }
-
-    const endCall = () => {
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      if (localVideoRef.current && localVideoRef.current.srcObject) {
-        localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-        localVideoRef.current.srcObject = null;
-      }
-      if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-        remoteVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-        remoteVideoRef.current.srcObject = null;
-      }
-      setCallActive(false);
       onClose();
-    };
-
-    return () => {
-      endCall();
-      socket.off("webrtc-answer");
-      socket.off("webrtc-offer");
-      socket.off("webrtc-candidate");
-      socket.off("webrtc-call-ended");
-    };
-  }, [socket, selectedUser]);
-
-  const handleAccept = async () => {
-    if (hasAcceptedRef.current) return; // Prevent multiple accepts
-    hasAcceptedRef.current = true;
-    setShowAcceptPopup(false);
-    setCallingState('connecting');
-    socket.emit("webrtc-accept", { to: selectedUser._id });
-    if (pendingOffer) {
-      try {
-        const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-        }
-
-        peerConnectionRef.current = new RTCPeerConnection(configuration);
-
-        localStream.getTracks().forEach((track) => {
-          peerConnectionRef.current.addTrack(track, localStream);
-        });
-
-        peerConnectionRef.current.ontrack = (event) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-          setCallingState('connected');
-        };
-
-        peerConnectionRef.current.onicecandidate = (event) => {
-          if (event.candidate) {
-            socket.emit("webrtc-candidate", {
-              to: selectedUser._id,
-              candidate: event.candidate,
-            });
-          }
-        };
-
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(pendingOffer));
-        const answer = await peerConnectionRef.current.createAnswer();
-        await peerConnectionRef.current.setLocalDescription(answer);
-
-        socket.emit("webrtc-answer", {
-          to: selectedUser._id,
-          answer,
-        });
-
-        setCallActive(true);
-        setCallingState('connected');
-      } catch (error) {
-        console.error("Error accepting call:", error);
-        onClose();
-      }
+      return null;
     }
   };
 
-  const handleDecline = () => {
+  // Start outgoing call
+  const startCall = async () => {
+    setCallState('calling');
+
+    const stream = await getUserMedia();
+    if (!stream) return;
+
+    const pc = createPeerConnection();
+
+    // Add local tracks to peer connection
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
+
+    try {
+      // Create and send offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      socket.emit("webrtc-offer", {
+        to: selectedUser._id,
+        offer,
+      });
+
+      setCallState('ringing');
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      setCallState('failed');
+      onClose();
+    }
+  };
+
+  // Accept incoming call
+  const acceptCall = async () => {
+    console.log("=== ACCEPT CALL STARTED ===");
+    console.log("Accept button clicked, starting accept process...");
+    setShowAcceptPopup(false);
+    setCallState('connecting');
+
+    console.log("Requesting user media...");
+    const stream = await getUserMedia();
+    if (!stream) {
+      console.log("Failed to get user media, aborting accept");
+      return;
+    }
+    console.log("User media obtained successfully");
+
+    console.log("Creating peer connection...");
+    const pc = createPeerConnection();
+    console.log("Peer connection created");
+
+    // Add local tracks to peer connection
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+      console.log(`Added track to peer connection: ${track.kind}`);
+    });
+
+    try {
+      console.log("Setting remote description from pending offer...");
+      console.log("Pending offer:", pendingOffer);
+      // Set remote description from pending offer
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+      console.log("Remote description set successfully");
+
+      console.log("Creating answer...");
+      // Create and send answer
+      const answer = await pc.createAnswer();
+      console.log("Answer created:", answer);
+      await pc.setLocalDescription(answer);
+      console.log("Local description set");
+
+      console.log("Sending answer to server...");
+      socket.emit("webrtc-answer", {
+        to: selectedUser._id,
+        answer,
+      });
+      console.log("Answer sent to server");
+
+      setCallState('connected');
+      console.log("=== ACCEPT CALL COMPLETED SUCCESSFULLY ===");
+    } catch (error) {
+      console.error("=== ERROR ACCEPTING CALL ===", error);
+      setCallState('failed');
+      onClose();
+    }
+  };
+
+  // Decline incoming call
+  const declineCall = () => {
     socket.emit("webrtc-decline", { to: selectedUser._id });
     onClose();
   };
 
-  const handleHangup = () => {
-    if (socket && selectedUser) {
-      socket.emit("webrtc-call-ended", { to: selectedUser._id });
-    }
+  // End call
+  const endCall = () => {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-    if (localVideoRef.current && localVideoRef.current.srcObject) {
-      localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-      localVideoRef.current.srcObject = null;
+
+    // Stop all media tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped track: ${track.kind}`);
+      });
+      localStreamRef.current = null;
     }
+
     if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-      remoteVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      remoteVideoRef.current.srcObject.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped remote track: ${track.kind}`);
+      });
       remoteVideoRef.current.srcObject = null;
     }
-    setCallActive(false);
+
+    socket.emit("webrtc-call-ended", { to: selectedUser._id });
     onClose();
   };
 
+  // Toggle mute
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!isMuted);
+    }
+  };
+
+  // Toggle video
+  const toggleVideo = () => {
+    if (localStreamRef.current) {
+      const videoTracks = localStreamRef.current.getVideoTracks();
+      videoTracks.forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsVideoOff(!isVideoOff);
+    }
+  };
+
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket || !selectedUser) return;
+
+    // Handle incoming call invitation
+    const handleCallInvitation = ({ from }) => {
+      console.log("Incoming call from:", from);
+      setCallState('incoming');
+      setShowAcceptPopup(true);
+    };
+
+    // Handle call acceptance
+    const handleCallAccepted = async () => {
+      console.log("Call accepted, starting call...");
+      await startCall();
+    };
+
+    // Handle call decline
+    const handleCallDeclined = () => {
+      console.log("Call declined");
+      setCallState('declined');
+      setTimeout(() => onClose(), 2000);
+    };
+
+    // Handle WebRTC offer
+    const handleOffer = ({ from, offer }) => {
+      console.log("=== RECEIVED WEBRTC OFFER ===");
+      console.log("Received offer from:", from);
+      console.log("Offer:", offer);
+      setPendingOffer(offer);
+      setCallState('incoming');
+      setShowAcceptPopup(true);
+      console.log("Set showAcceptPopup to true, callState to incoming");
+    };
+
+    // Handle WebRTC answer
+    const handleAnswer = async ({ answer }) => {
+      console.log("Received answer");
+      if (peerConnectionRef.current) {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (error) {
+          console.error("Error setting remote description:", error);
+        }
+      }
+    };
+
+    // Handle ICE candidates
+    const handleIceCandidate = async ({ candidate }) => {
+      console.log("Received ICE candidate");
+      if (peerConnectionRef.current) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (error) {
+          console.error("Error adding ICE candidate:", error);
+        }
+      }
+    };
+
+    // Handle call ended
+    const handleCallEnded = () => {
+      console.log("Call ended by other party");
+      endCall();
+    };
+
+    // Register event listeners
+    socket.on("webrtc-call-invitation", handleCallInvitation);
+    socket.on("webrtc-accept", handleCallAccepted);
+    socket.on("webrtc-decline", handleCallDeclined);
+    socket.on("webrtc-offer", handleOffer);
+    socket.on("webrtc-answer", handleAnswer);
+    socket.on("webrtc-candidate", handleIceCandidate);
+    socket.on("webrtc-call-ended", handleCallEnded);
+
+    // Start call if outgoing
+    if (!isIncoming) {
+      socket.emit("webrtc-call-invitation", { to: selectedUser._id });
+      setCallState('calling');
+    }
+
+    // Cleanup
+    return () => {
+      socket.off("webrtc-call-invitation", handleCallInvitation);
+      socket.off("webrtc-accept", handleCallAccepted);
+      socket.off("webrtc-decline", handleCallDeclined);
+      socket.off("webrtc-offer", handleOffer);
+      socket.off("webrtc-answer", handleAnswer);
+      socket.off("webrtc-candidate", handleIceCandidate);
+      socket.off("webrtc-call-ended", handleCallEnded);
+      endCall();
+    };
+  }, [socket, selectedUser, isIncoming]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-50 p-4">
+      {/* Accept/Decline Popup */}
       {showAcceptPopup && (
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-            <h2 className="text-xl font-bold mb-4">Incoming Video Call</h2>
-            <p className="mb-4">From: {selectedUser?.fullName}</p>
+          <div className="bg-white p-8 rounded-lg shadow-2xl text-center max-w-sm w-full mx-4">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Incoming Video Call</h2>
+              <p className="text-gray-600">From: {selectedUser?.fullName}</p>
+            </div>
             <div className="flex gap-4">
-              <button onClick={handleAccept} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
+              <button
+                onClick={acceptCall}
+                className="flex-1 bg-green-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
                 Accept
               </button>
-              <button onClick={handleDecline} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition">
+              <button
+                onClick={declineCall}
+                className="flex-1 bg-red-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
                 Decline
               </button>
             </div>
           </div>
         </div>
       )}
-      <div className="flex gap-4 mb-4">
-        <div>
-          <p className="text-white text-center mb-2">You</p>
-          <video ref={localVideoRef} autoPlay muted playsInline className="w-48 h-36 rounded-md bg-black" />
+
+      {/* Video Container */}
+      <div className="flex gap-4 mb-6 w-full max-w-4xl">
+        {/* Local Video */}
+        <div className="flex-1">
+          <div className="relative bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-64 object-cover"
+            />
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+              You {isMuted && "(Muted)"} {isVideoOff && "(Video Off)"}
+            </div>
+          </div>
         </div>
-        <div>
-          <p className="text-white text-center mb-2">Remote</p>
-          <video ref={remoteVideoRef} autoPlay playsInline className="w-48 h-36 rounded-md bg-black" />
+
+        {/* Remote Video */}
+        <div className="flex-1">
+          <div className="relative bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-64 object-cover"
+            />
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+              {selectedUser?.fullName || "Remote"}
+            </div>
+          </div>
         </div>
       </div>
-      <div className="text-white text-center mb-4">
-        {callingState === 'calling' && <p>Calling...</p>}
-        {callingState === 'ringing' && <p>Ringing...</p>}
-        {callingState === 'connecting' && <p>Connecting...</p>}
-        {callingState === 'connected' && <p>Connected</p>}
-        {callingState === 'declined' && <p>Call declined</p>}
+
+      {/* Call Status */}
+      <div className="text-white text-center mb-6">
+        {callState === 'calling' && <p className="text-lg">Calling {selectedUser?.fullName}...</p>}
+        {callState === 'ringing' && <p className="text-lg">Ringing...</p>}
+        {callState === 'connecting' && <p className="text-lg">Connecting...</p>}
+        {callState === 'connected' && <p className="text-lg text-green-400">Connected</p>}
+        {callState === 'failed' && <p className="text-lg text-red-400">Connection failed</p>}
+        {callState === 'declined' && <p className="text-lg text-red-400">Call declined</p>}
       </div>
-      <button onClick={handleHangup} className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition">
-        Hang Up
-      </button>
+
+      {/* Control Buttons */}
+      <div className="flex items-center gap-4">
+        {/* Mute Button */}
+        <button
+          onClick={toggleMute}
+          className={`p-4 rounded-full transition-colors ${
+            isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-600 hover:bg-gray-700'
+          }`}
+          title={isMuted ? "Unmute" : "Mute"}
+        >
+          {isMuted ? (
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          )}
+        </button>
+
+        {/* Video Toggle Button */}
+        <button
+          onClick={toggleVideo}
+          className={`p-4 rounded-full transition-colors ${
+            isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-600 hover:bg-gray-700'
+          }`}
+          title={isVideoOff ? "Turn on video" : "Turn off video"}
+        >
+          {isVideoOff ? (
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+            </svg>
+          )}
+        </button>
+
+        {/* End Call Button */}
+        <button
+          onClick={endCall}
+          className="p-4 bg-red-500 hover:bg-red-600 rounded-full transition-colors"
+          title="End call"
+        >
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.684A1 1 0 008.28 3H5z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };
+
+export default VideoCall;
