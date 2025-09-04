@@ -22,17 +22,56 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
   const [retryTimeout, setRetryTimeout] = useState(null);
   const [remoteVideoPlaying, setRemoteVideoPlaying] = useState(false);
 
-  // WebRTC Configuration with reliable TURN servers
+  // WebRTC Configuration with updated reliable TURN servers
   const rtcConfiguration = {
     iceServers: [
-      // Primary STUN servers
+      // Primary STUN servers (Google's reliable STUN servers)
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
       { urls: "stun:stun2.l.google.com:19302" },
       { urls: "stun:stun3.l.google.com:19302" },
       { urls: "stun:stun4.l.google.com:19302" },
 
+      // Additional STUN servers for better coverage
+      { urls: "stun:stun.stunprotocol.org:3478" },
+      { urls: "stun:stun.nextcloud.com:443" },
+
       // Reliable TURN servers (updated with working public servers)
+      // Open Relay Project - Free TURN servers with good reliability
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+
+      // Alternative free TURN servers
+      {
+        urls: "turn:relay.metered.ca:80",
+        username: "free",
+        credential: "free"
+      },
+      {
+        urls: "turn:relay.metered.ca:443",
+        username: "free",
+        credential: "free"
+      },
+      {
+        urls: "turn:relay.metered.ca:443?transport=tcp",
+        username: "free",
+        credential: "free"
+      },
+
+      // Fallback TURN servers (may have limitations)
       {
         urls: "turn:turn.bistri.com:80",
         username: "homeo",
@@ -42,28 +81,14 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
         urls: "turn:turn.anyfirewall.com:443?transport=tcp",
         username: "webrtc",
         credential: "webrtc"
-      },
-      {
-        urls: "turn:numb.viagenie.ca",
-        username: "webrtc@live.com",
-        credential: "muazkh"
-      },
-      // Additional fallback TURN servers
-      {
-        urls: "turn:192.158.29.39:3478?transport=udp",
-        username: "28224511:1379330808",
-        credential: "JZEOEt2V3Qb0y27GRntt2u2PAY="
-      },
-      {
-        urls: "turn:192.158.29.39:3478?transport=tcp",
-        username: "28224511:1379330808",
-        credential: "JZEOEt2V3Qb0y27GRntt2u2PAY="
       }
     ],
     iceCandidatePoolSize: 10,
     // Additional configuration for better connectivity
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
+    // Enable ICE restart for better recovery
+    iceTransportPolicy: "all"
   };
 
   // Initialize WebRTC peer connection with enhanced configuration
@@ -140,6 +165,7 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         console.log("ICE connection established successfully");
         setCallState('connected');
+        setConnectionQuality('good');
         // Clear any pending retry timeout on successful connection
         if (retryTimeout) {
           clearTimeout(retryTimeout);
@@ -148,9 +174,18 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
       } else if (pc.iceConnectionState === 'connecting') {
         console.log("ICE connecting...");
         setCallState('connecting');
+        setConnectionQuality('connecting');
       } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
         console.log("ICE connection failed or disconnected");
+        console.log("This may indicate TURN server issues or network problems");
         setCallState('failed');
+        setConnectionQuality('failed');
+
+        // Log additional diagnostic information
+        console.log("Current ICE gathering state:", pc.iceGatheringState);
+        console.log("Local ICE candidates count:", pc.getSenders().length);
+        console.log("Remote ICE candidates count:", pc.getReceivers().length);
+
         // Don't automatically close the call - let user decide
         // setTimeout(() => onClose(), 3000);
 
@@ -160,10 +195,17 @@ const VideoCall = ({ onClose, isIncoming = false, caller = null }) => {
             console.log("Retrying connection attempt", connectionAttempts + 1);
             setConnectionAttempts(prev => prev + 1);
             if (peerConnectionRef.current) {
-              peerConnectionRef.current.restartIce();
+              try {
+                peerConnectionRef.current.restartIce();
+                console.log("ICE restart initiated");
+              } catch (error) {
+                console.error("Failed to restart ICE:", error);
+              }
             }
           }, 5000);
           setRetryTimeout(timeout);
+        } else {
+          console.log("Max retry attempts reached. Connection failed.");
         }
       }
     };
