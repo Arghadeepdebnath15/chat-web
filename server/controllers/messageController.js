@@ -4,7 +4,7 @@ import cloudinary from "../lib/cloudinary.js"
 import { io, userSocketMap } from "../server.js";
 
 
-// Get all users with whom the logged in user has chatted
+// Get all users with whom the logged in user has chatted or has unread messages from
 export const getUsersForSidebar = async (req, res)=>{
     try {
         const userId = req.user._id;
@@ -13,7 +13,10 @@ export const getUsersForSidebar = async (req, res)=>{
         const messageUsers = await Message.distinct("senderId", { receiverId: userId });
         const messageUsers2 = await Message.distinct("receiverId", { senderId: userId });
 
-        const allUserIds = [...new Set([...messageUsers, ...messageUsers2])];
+        // Find users who have sent unread messages to the current user
+        const unreadMessageSenders = await Message.distinct("senderId", { receiverId: userId, seen: false });
+
+        const allUserIds = [...new Set([...messageUsers, ...messageUsers2, ...unreadMessageSenders])];
 
         const filteredUsers = await User.find({_id: {$in: allUserIds}}).select("-password");
 

@@ -58,14 +58,45 @@ const ChatContainer = () => {
   return selectedUser ? (
     <div className='h-full overflow-scroll relative backdrop-blur-lg'>
       {/* ------- header ------- */}
-      <div className='flex items-center gap-3 py-3 px-4 border-b border-purple-400 bg-gradient-to-r from-purple-600/70 to-pink-600/70 backdrop-blur-sm'>
-        <img onClick={toggleRightSidebar} src={selectedUser.profilePic || assets.avatar_icon} alt="" className="w-8 rounded-full shadow-md border-2 border-yellow-400 cursor-pointer hover:scale-105 transition-transform"/>
-        <p className='flex-1 text-lg text-white flex items-center gap-2 font-semibold'>
+      <div className='flex items-center gap-4 py-2 px-6 border-b border-purple-400/30 bg-purple-600/90 backdrop-blur-md shadow-xl relative overflow-hidden'>
+        {/* Subtle animated background elements */}
+        <div className='absolute inset-0 bg-purple-500/10 animate-pulse'></div>
+
+        {/* Profile Picture with enhanced styling */}
+        <div className='relative z-10'>
+          <img onClick={toggleRightSidebar} src={selectedUser.profilePic || assets.avatar_icon} alt=""
+               className="w-10 h-10 rounded-full shadow-xl border-2 border-yellow-400/80 cursor-pointer hover:scale-110 transition-all duration-300 hover:shadow-yellow-400/50 hover:border-yellow-300 ring-2 ring-yellow-400/20 hover:ring-yellow-400/40"/>
+          {onlineUsers.includes(selectedUser._id) && (
+            <div className='absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-lime-400 to-green-500 rounded-full border-2 border-white shadow-lg animate-pulse'>
+              <div className='w-full h-full bg-gradient-to-r from-lime-300 to-green-400 rounded-full animate-ping'></div>
+            </div>
+          )}
+        </div>
+
+        {/* User Name with enhanced typography */}
+        <div className='flex-1 relative z-10'>
+          <p className='text-xl text-white font-bold bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent drop-shadow-lg'>
             {selectedUser.fullName}
-            {onlineUsers.includes(selectedUser._id) && <span className="w-3 h-3 rounded-full bg-lime-400 animate-pulse shadow-lg"></span>}
-        </p>
-        <img onClick={()=> setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7 hover:opacity-70 transition-opacity cursor-pointer'/>
-        <img src={assets.help_icon} alt="" className='max-md:hidden max-w-5 hover:opacity-70 transition-opacity cursor-pointer'/>
+          </p>
+          <p className='text-sm text-gray-300 font-medium'>
+            {onlineUsers.includes(selectedUser._id) ? (
+              <span className='flex items-center gap-1'>
+                <span className='w-2 h-2 bg-lime-400 rounded-full animate-pulse'></span>
+                Online
+              </span>
+            ) : (
+              <span className='text-gray-400'>Offline</span>
+            )}
+          </p>
+        </div>
+
+        {/* Action buttons with enhanced styling */}
+        <div className='flex items-center gap-2 relative z-10'>
+          <img onClick={()=> setSelectedUser(null)} src={assets.arrow_icon} alt=""
+               className='md:hidden max-w-7 hover:opacity-80 transition-all duration-300 cursor-pointer hover:scale-110 p-1 rounded-full hover:bg-white/10'/>
+          <img src={assets.help_icon} alt=""
+               className='max-md:hidden max-w-5 hover:opacity-80 transition-all duration-300 cursor-pointer hover:scale-110 p-1 rounded-full hover:bg-white/10'/>
+        </div>
       </div>
       {/* ------- chat area ------- */}
       <div className='flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6 bg-gradient-to-b from-transparent to-gray-900/20 scroll-smooth touch-auto -webkit-overflow-scrolling-touch'>
