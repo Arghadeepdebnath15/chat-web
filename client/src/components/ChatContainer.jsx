@@ -119,6 +119,9 @@ const ChatContainer = () => {
                 <div className="text-center text-xs">
                     <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 h-7 rounded-full shadow-md object-cover' />
                     <p className='text-gray-400 mt-1'>{formatMessageTime(msg.createdAt)}</p>
+                    {msg.senderId === authUser._id && msg.seen && (
+                        <p className='text-blue-400 text-xs mt-1 font-medium'>Seen</p>
+                    )}
                 </div>
             </div>
           ))
