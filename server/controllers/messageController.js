@@ -130,6 +130,16 @@ export const sendMessage = async (req, res) =>{
         const receiverSocketId = userSocketMap[receiverId];
         if (receiverSocketId){
             io.to(receiverSocketId).emit("newMessage", newMessage)
+
+            // Emit event to add new user to chat list if not already present
+            io.to(receiverSocketId).emit("newChatUser", {
+                user: {
+                    _id: newMessage.senderId,
+                    fullName: newMessage.senderName || "Unknown",
+                    avatar: newMessage.senderAvatar || null
+                },
+                message: newMessage
+            });
         }
 
         res.json({success: true, newMessage});
