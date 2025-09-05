@@ -113,18 +113,11 @@ export const ChatProvider = ({ children })=>{
                 setUnseenMessages((prevUnseenMessages)=>( {
                     ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
                 }));
-                // Add new user to users list if not already present
-                setUsers((prevUsers) => {
-                    const userExists = prevUsers.some(user => String(user._id) === String(newMessage.senderId));
-                    if (!userExists) {
-                        const newUser = newMessage.sender ? {...newMessage.sender} : {
-                            _id: newMessage.senderId,
-                            fullName: newMessage.senderName || "Unknown",
-                            avatar: newMessage.senderAvatar || null
-                        };
-                        return [...prevUsers, newUser];
-                    }
-                    return prevUsers;
+                // Do NOT add unknown user to users list
+                // Instead, just update messages state to include the new message
+                setMessages((prevMessages) => {
+                    const clonedMessage = {...newMessage, seen: false};
+                    return [...prevMessages, clonedMessage];
                 });
             }
         })
