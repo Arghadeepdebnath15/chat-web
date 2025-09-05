@@ -175,26 +175,22 @@ export const ChatProvider = ({ children })=>{
             }else{
                 console.log("Message not from selected user, updating unseen messages");
                 setUnseenMessages((prevUnseenMessages)=>( {
-                    ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
+                    ...prevUnseenMessages, [newMessage.senderId] : (prevUnseenMessages[newMessage.senderId] || 0) + 1
                 }));
-            // Add unknown user to users list when receiving a new message from a user not in the list
-            setUsers((prevUsers) => {
-                const userExists = prevUsers.some(user => user._id === newMessage.senderId);
-                if (!userExists) {
-                    // Fetch user details from server or create a minimal user object
-                    const newUser = {
-                        _id: newMessage.senderId,
-                        fullName: newMessage.senderName || "Unknown",
-                        profilePic: newMessage.senderAvatar || null
-                    };
-                    return [...prevUsers, newUser];
-                }
-                return prevUsers;
-            });
-            setMessages((prevMessages) => {
-                const clonedMessage = {...newMessage, seen: false};
-                return [...prevMessages, clonedMessage];
-            });
+                // Add unknown user to users list when receiving a new message from a user not in the list
+                setUsers((prevUsers) => {
+                    const userExists = prevUsers.some(user => user._id === newMessage.senderId);
+                    if (!userExists) {
+                        // Fetch user details from server or create a minimal user object
+                        const newUser = {
+                            _id: newMessage.senderId,
+                            fullName: newMessage.senderName || "Unknown",
+                            profilePic: newMessage.senderAvatar || null
+                        };
+                        return [...prevUsers, newUser];
+                    }
+                    return prevUsers;
+                });
             }
         })
 
@@ -218,26 +214,37 @@ export const ChatProvider = ({ children })=>{
 
         // Listen for messagesSeen event to update multiple messages seen status
         socket.on("messagesSeen", (messageIds) => {
-            setMessages((prevMessages) =>
-                prevMessages.map((msg) =>
+            setMessages((prevMessages) => {
+                const updatedMessages = prevMessages.map((msg) =>
                     messageIds.includes(msg._id) ? { ...msg, seen: true } : msg
-                )
-            );
-            // Also update unseenMessages count for senders
-            // Temporarily disabled to avoid prevMessages undefined error
-            // setUnseenMessages((prevUnseen) => {
-            //     const newUnseen = { ...prevUnseen };
-            //     messageIds.forEach((messageId) => {
-            //         const msg = prevMessages.find(m => m._id === messageId);
-            //         if (msg && newUnseen[msg.senderId]) {
-            //             newUnseen[msg.senderId] = Math.max(0, newUnseen[msg.senderId] - 1);
-            //             if (newUnseen[msg.senderId] === 0) {
-            //                 delete newUnseen[msg.senderId];
-            //             }
-            //         }
-            //     });
-            //     return newUnseen;
-            // });
+                );
+
+                // Update unseenMessages count for senders
+                const sendersToDecrement = new Set();
+                messageIds.forEach((messageId) => {
+                    const msg = updatedMessages.find(m => m._id === messageId);
+                    if (msg && msg.senderId !== authUser?._id) {
+                        sendersToDecrement.add(msg.senderId);
+                    }
+                });
+
+                if (sendersToDecrement.size > 0) {
+                    setUnseenMessages((prevUnseen) => {
+                        const newUnseen = { ...prevUnseen };
+                        sendersToDecrement.forEach((senderId) => {
+                            if (newUnseen[senderId]) {
+                                newUnseen[senderId] = Math.max(0, newUnseen[senderId] - 1);
+                                if (newUnseen[senderId] === 0) {
+                                    delete newUnseen[senderId];
+                                }
+                            }
+                        });
+                        return newUnseen;
+                    });
+                }
+
+                return updatedMessages;
+            });
         });
 
         // Typing indicator events
@@ -283,11 +290,7 @@ export const ChatProvider = ({ children })=>{
                 }
                 return prevUsers;
             });
-            // Also update unseen messages count
-            setUnseenMessages((prevUnseenMessages) => ({
-                ...prevUnseenMessages,
-                [message.senderId]: (prevUnseenMessages[message.senderId] || 0) + 1
-            }));
+            // Note: Unseen messages count is already handled by newMessage event
         });
     }
 
