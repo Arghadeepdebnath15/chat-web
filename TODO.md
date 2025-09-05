@@ -1,29 +1,21 @@
-# Video Calling Feature - COMPLETED
+# TODO: Make Chat Messages Realtime
 
-## Summary of Changes
-- ✅ Removed old VideoCall.jsx component (large, monolithic ~600 lines)
-- ✅ Integrated new VideoCallNew.jsx component (cleaner, modular design)
-- ✅ Updated ChatContainer.jsx to use VideoCallNew instead of VideoCall
-- ✅ New architecture uses WebRTCService.js for modular WebRTC handling
-- ✅ Improved separation of concerns and maintainability
+## Steps to Complete
 
-## Previous Issues Fixed
-- Event name inconsistencies between client and server
-- Signaling flow problems with invitation/offer handling
-- Outdated TURN servers causing connection failures
-- Complex autoplay handling failing on some browsers
-- State management conflicts
+- [x] Verify socket connection is established in AuthContext.jsx
+- [x] Add debugging logs to confirm "newMessage" event reception in ChatContext.jsx
+- [ ] Ensure selectedUser state matches senderId for message updates
+- [ ] Test real-time message updates without refresh
+- [ ] Fix any issues with socket event handling or state updates
 
-## Architecture Improvements
-- **Modular Design**: WebRTC logic separated into WebRTCService.js
-- **Better Error Handling**: Improved connection state management
-- **Cleaner UI**: Simplified video calling component
-- **Enhanced Reliability**: Better TURN/STUN server configuration
+## Current Status
+- Socket.IO is installed and configured on both client and server
+- Server emits "newMessage" events when messages are sent
+- Client subscribes to "newMessage" events in ChatContext.jsx
+- User reports needing to refresh to see new messages
+- Added debugging logs to ChatContext.jsx for "newMessage" event
 
-## Testing Required
-- [ ] Test outgoing calls
-- [ ] Test incoming calls
-- [ ] Test call acceptance/decline
-- [ ] Test video display on both sides
-- [ ] Test on different browsers/devices
-- [ ] Test connection quality and retry mechanisms
+## Next Steps
+- Add debugging logs to AuthContext.jsx for socket connection
+- Ensure message state updates correctly on "newMessage" event
+- Test the fix by sending messages between users

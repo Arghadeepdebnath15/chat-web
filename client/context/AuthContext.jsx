@@ -84,6 +84,7 @@ export const AuthProvider = ({ children })=>{
     // Connect socket function to handle socket connection and online users updates
     const connectSocket = (userData)=>{
         if(!userData || socket?.connected) return;
+        console.log("Connecting socket for user:", userData._id);
         const newSocket = io(backendUrl, {
             query: {
                 userId: userData._id,
@@ -92,7 +93,16 @@ export const AuthProvider = ({ children })=>{
         newSocket.connect();
         setSocket(newSocket);
 
+        newSocket.on("connect", () => {
+            console.log("Socket connected:", newSocket.id);
+        });
+
+        newSocket.on("disconnect", () => {
+            console.log("Socket disconnected");
+        });
+
         newSocket.on("getOnlineUsers", (userIds)=>{
+            console.log("Received online users:", userIds);
             setOnlineUsers(userIds);
         })
     }

@@ -98,11 +98,15 @@ export const ChatProvider = ({ children })=>{
         if(!socket) return;
 
         socket.on("newMessage", (newMessage)=>{
+            console.log("Received newMessage event:", newMessage);
+            console.log("Selected user:", selectedUser);
             if(selectedUser && newMessage.senderId === selectedUser._id){
+                console.log("Updating messages for selected user");
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
             }else{
+                console.log("Message not from selected user, updating unseen messages");
                 setUnseenMessages((prevUnseenMessages)=>( {
                     ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
                 }))
