@@ -17,12 +17,14 @@ export const ChatProvider = ({ children })=>{
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [incomingCall, setIncomingCall] = useState(null);
 
-    // Persist selectedUser in localStorage
+    // Persist selectedUser in localStorage (but don't auto-restore on app load)
+    // This allows the app to start with no user selected, showing only the user list
     useEffect(() => {
-        const savedSelectedUser = localStorage.getItem('selectedUser');
-        if (savedSelectedUser) {
-            setSelectedUser(JSON.parse(savedSelectedUser));
-        }
+        // Removed auto-restoration to show user list only on app start
+        // const savedSelectedUser = localStorage.getItem('selectedUser');
+        // if (savedSelectedUser) {
+        //     setSelectedUser(JSON.parse(savedSelectedUser));
+        // }
     }, []);
 
     useEffect(() => {

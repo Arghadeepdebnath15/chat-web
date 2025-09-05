@@ -4,6 +4,8 @@
 
 *{
   font-family: "Outfit", sans-serif;
+  -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+  scroll-behavior: smooth; /* Smooth scrolling for modern browsers */
 }
 
 ::-webkit-scrollbar{
