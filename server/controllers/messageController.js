@@ -126,19 +126,29 @@ export const sendMessage = async (req, res) =>{
             image: imageUrl
         })
 
+        // Fetch sender's user data for the socket emission
+        const senderUser = await User.findById(senderId).select("fullName profilePic");
+
+        // Create message object with sender info for socket emission
+        const messageWithSender = {
+            ...newMessage.toObject(),
+            senderName: senderUser?.fullName,
+            senderAvatar: senderUser?.profilePic
+        };
+
         // Emit the new message to the receiver's socket
         const receiverSocketId = userSocketMap[receiverId];
         if (receiverSocketId){
-            io.to(receiverSocketId).emit("newMessage", newMessage)
+            io.to(receiverSocketId).emit("newMessage", messageWithSender)
 
             // Emit event to add new user to chat list if not already present
             io.to(receiverSocketId).emit("newChatUser", {
                 user: {
-                    _id: newMessage.senderId,
-                    fullName: newMessage.senderName || "Unknown",
-                    avatar: newMessage.senderAvatar || null
+                    _id: senderId,
+                    fullName: senderUser?.fullName || "Unknown",
+                    profilePic: senderUser?.profilePic || null
                 },
-                message: newMessage
+                message: messageWithSender
             });
         }
 
