@@ -10,7 +10,7 @@ import './TypingIndicator.css'
 const ChatContainer = () => {
 
     const { messages, users, selectedUser, setSelectedUser, sendMessage, deleteMessage, deleteAllMessages,
-        getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages, incomingCall, setIncomingCall } = useContext(ChatContext)
+        getMessages, searchUsers, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages, incomingCall, setIncomingCall } = useContext(ChatContext)
 
     const { authUser, onlineUsers } = useContext(AuthContext)
 
@@ -20,6 +20,11 @@ const ChatContainer = () => {
     const [input, setInput] = useState('');
     const [showVideoCall, setShowVideoCall] = useState(false);
     const [incomingCallDetails, setIncomingCallDetails] = useState(null);
+    const [selectedMessage, setSelectedMessage] = useState(null);
+    const [showShareInterface, setShowShareInterface] = useState(false);
+    const [shareSearchQuery, setShareSearchQuery] = useState('');
+    const [shareResults, setShareResults] = useState([]);
+    const [pressTimer, setPressTimer] = useState(null);
 
     // Handle sending a message
     const handleSendMessage = async (e)=>{
@@ -111,6 +116,81 @@ const ChatContainer = () => {
         setIncomingCallDetails(null);
     }
 
+    // Handle message selection for sharing
+    const handleMessageSelect = (msg) => {
+        setSelectedMessage(msg);
+        setShowShareInterface(true);
+        setShareSearchQuery('');
+        setShareResults([]);
+    }
+
+    // Handle press and hold for mobile
+    const handlePressStart = (msg) => {
+        const timer = setTimeout(() => {
+            handleMessageSelect(msg);
+        }, 500); // 500ms for press and hold
+        setPressTimer(timer);
+    }
+
+    const handlePressEnd = () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            setPressTimer(null);
+        }
+    }
+
+    // Handle search for sharing
+    const handleShareSearch = async (query) => {
+        setShareSearchQuery(query);
+        if (query.trim()) {
+            try {
+                const searchResults = await searchUsers(query);
+                if (searchResults) {
+                    // Filter out current user from results
+                    const filtered = searchResults.filter(user => user._id !== authUser._id);
+                    setShareResults(filtered);
+                } else {
+                    setShareResults([]);
+                }
+            } catch (error) {
+                console.error("Error searching users:", error);
+                setShareResults([]);
+            }
+        } else {
+            setShareResults([]);
+        }
+    }
+
+    // Handle sharing message
+    const handleShareMessage = async (recipientId) => {
+        if (!selectedMessage) return;
+
+        try {
+            let messageData = {};
+            if (selectedMessage.text) {
+                messageData.text = `Shared: "${selectedMessage.text}"`;
+            } else if (selectedMessage.image) {
+                messageData.image = selectedMessage.image;
+                messageData.text = "Shared an image";
+            }
+
+            await sendMessage(messageData, recipientId);
+            toast.success("Message shared successfully!");
+            setShowShareInterface(false);
+            setSelectedMessage(null);
+        } catch (error) {
+            toast.error("Failed to share message");
+        }
+    }
+
+    // Close share interface
+    const closeShareInterface = () => {
+        setShowShareInterface(false);
+        setSelectedMessage(null);
+        setShareSearchQuery('');
+        setShareResults([]);
+    }
+
   return selectedUser ? (
     <div className='h-full overflow-scroll relative backdrop-blur-lg'>
       {/* ------- header ------- */}
@@ -185,11 +265,17 @@ const ChatContainer = () => {
             </div>
           ) : (
             messages.filter(msg => (String(msg.senderId) === String(selectedUser._id) && String(msg.receiverId) === String(authUser._id)) || (String(msg.receiverId) === String(selectedUser._id) && String(msg.senderId) === String(authUser._id))).map((msg, index)=>(
-              <div key={index} onDoubleClick={(e) => { e.stopPropagation(); deleteMessage(msg._id); }} className={`flex items-end gap-2 justify-end animate-fade-in ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
+              <div
+                key={index}
+                onDoubleClick={(e) => { e.stopPropagation(); deleteMessage(msg._id); }}
+                onClick={(e) => { e.stopPropagation(); handleMessageSelect(msg); }}
+                onTouchStart={(e) => { e.stopPropagation(); handlePressStart(msg); }}
+                onTouchEnd={(e) => { e.stopPropagation(); handlePressEnd(); }}
+                className={`flex items-end gap-2 justify-end animate-fade-in cursor-pointer hover:scale-105 transition-transform ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}
+              >
                   {msg.image ? (
                       <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
                   ):(
-
                       <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${authUser && msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
                   )}
                   <div className="text-center text-xs">
@@ -243,6 +329,92 @@ const ChatContainer = () => {
             isIncoming={!!incomingCallDetails}
             caller={incomingCallDetails?.from}
         />
+    )}
+
+    {/* Share Message Interface */}
+    {showShareInterface && (
+        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'>
+            <div className='bg-gradient-to-br from-purple-900/90 to-indigo-900/90 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-purple-400/30'>
+                {/* Header */}
+                <div className='flex items-center justify-between mb-4'>
+                    <h3 className='text-xl font-bold text-white'>Share Message</h3>
+                    <button
+                        onClick={closeShareInterface}
+                        className='text-gray-400 hover:text-white transition-colors'
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Selected Message Preview */}
+                <div className='mb-4 p-3 bg-black/20 rounded-lg border border-gray-600/30'>
+                    {selectedMessage?.image ? (
+                        <img src={selectedMessage.image} alt="Shared" className='max-w-full h-20 object-cover rounded-lg mb-2' />
+                    ) : (
+                        <p className='text-white text-sm'>{selectedMessage?.text}</p>
+                    )}
+                </div>
+
+                {/* Search Input */}
+                <div className='mb-4'>
+                    <input
+                        type="text"
+                        placeholder="Search users to share with..."
+                        value={shareSearchQuery}
+                        onChange={(e) => handleShareSearch(e.target.value)}
+                        className='w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                    />
+                </div>
+
+                {/* Search Results */}
+                <div className='max-h-48 overflow-y-auto mb-4'>
+                    {shareResults.length > 0 ? (
+                        shareResults.map(user => (
+                            <div
+                                key={user._id}
+                                onClick={() => handleShareMessage(user._id)}
+                                className='flex items-center gap-3 p-3 hover:bg-purple-800/30 rounded-lg cursor-pointer transition-colors'
+                            >
+                                <img
+                                    src={user.profilePic || assets.avatar_icon}
+                                    alt={user.fullName}
+                                    className='w-10 h-10 rounded-full object-cover'
+                                />
+                                <div className='flex-1'>
+                                    <p className='text-white font-medium'>{user.fullName}</p>
+                                    <p className='text-gray-400 text-sm'>
+                                        {onlineUsers.includes(user._id) ? 'Online' : 'Offline'}
+                                    </p>
+                                </div>
+                                <button className='px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors'>
+                                    Share
+                                </button>
+                            </div>
+                        ))
+                    ) : shareSearchQuery.trim() ? (
+                        <p className='text-gray-400 text-center py-4'>No users found</p>
+                    ) : (
+                        <p className='text-gray-400 text-center py-4'>Start typing to search users</p>
+                    )}
+                </div>
+
+                {/* Send Button */}
+                {shareResults.length > 0 && (
+                    <button
+                        onClick={() => {
+                            if (shareResults.length === 1) {
+                                handleShareMessage(shareResults[0]._id);
+                            }
+                        }}
+                        className='w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all duration-200 shadow-lg'
+                    >
+                        Send to {shareResults.length === 1 ? shareResults[0].fullName : 'Selected User'}
+                    </button>
+                )}
+            </div>
+        </div>
     )}
 
     </div>

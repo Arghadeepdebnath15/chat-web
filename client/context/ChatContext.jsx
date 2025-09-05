@@ -79,12 +79,16 @@ export const ChatProvider = ({ children })=>{
         }
     }
 
-    // function to send message to selected user
-    const sendMessage = async (messageData)=>{
+    // function to send message to selected user or specified recipient
+    const sendMessage = async (messageData, recipientId = null)=>{
         try {
-            const {data} = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData);
+            const targetUserId = recipientId || selectedUser._id;
+            const {data} = await axios.post(`/api/messages/send/${targetUserId}`, messageData);
             if(data.success){
-                setMessages((prevMessages)=>[...prevMessages, data.newMessage])
+                // Only add to current messages if sending to selected user
+                if (!recipientId || recipientId === selectedUser?._id) {
+                    setMessages((prevMessages)=>[...prevMessages, data.newMessage])
+                }
             }else{
                 toast.error(data.message);
             }
