@@ -26,35 +26,6 @@ const ChatContainer = () => {
     const [shareResults, setShareResults] = useState([]);
     const [pressTimer, setPressTimer] = useState(null);
 
-    // Swipe gesture state
-    const [touchStart, setTouchStart] = useState(null);
-    const [touchEnd, setTouchEnd] = useState(null);
-
-    // Minimum swipe distance in pixels to trigger action
-    const minSwipeDistance = 50;
-
-    // Handle touch start event
-    const onTouchStart = (e) => {
-        setTouchEnd(null); // Reset touch end
-        setTouchStart(e.targetTouches[0].clientX);
-    };
-
-    // Handle touch move event
-    const onTouchMove = (e) => {
-        setTouchEnd(e.targetTouches[0].clientX);
-    };
-
-    // Handle touch end event
-    const onTouchEnd = () => {
-        if (!touchStart || !touchEnd) return;
-        const distance = touchEnd - touchStart;
-        if (distance > minSwipeDistance) {
-            // Detected swipe right
-            // Close chat by setting selectedUser to null to show user list
-            setSelectedUser(null);
-        }
-    };
-
     // Handle sending a message
     const handleSendMessage = async (e)=>{
         if(e) {
@@ -221,12 +192,7 @@ const ChatContainer = () => {
     }
 
   return selectedUser ? (
-    <div
-      className='h-full overflow-scroll relative backdrop-blur-lg'
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
+    <div className='h-full overflow-scroll relative backdrop-blur-lg'>
       {/* ------- header ------- */}
       <div className='flex items-center gap-4 py-2 px-6 border-b border-purple-400/30 bg-purple-600/90 backdrop-blur-md shadow-xl relative overflow-hidden'>
         {/* Subtle animated background elements */}
