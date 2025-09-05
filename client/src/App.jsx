@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
+import PWAInstall from './components/PWAInstall'
 import {Toaster} from "react-hot-toast"
 import { AuthContext } from '../context/AuthContext'
 
@@ -25,6 +26,7 @@ const App = () => {
         <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to="/" />}/>
         <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to="/login" />}/>
       </Routes>
+      <PWAInstall />
     </div>
   )
 }
