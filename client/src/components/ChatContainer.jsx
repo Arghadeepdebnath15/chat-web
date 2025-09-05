@@ -23,8 +23,12 @@ const ChatContainer = () => {
 
     // Handle sending a message
     const handleSendMessage = async (e)=>{
+        console.log("handleSendMessage called with input:", input);
         e.preventDefault();
-        if(input.trim() === "") return null;
+        if(input.trim() === "") {
+            console.log("Input is empty, not sending message");
+            return null;
+        }
         // Clear typing timeout and stop typing indicator when sending message
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
@@ -203,7 +207,7 @@ const ChatContainer = () => {
     <div className='absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/50 to-transparent transition-all duration-500 ease-out'>
         <div className='flex items-center gap-2'>
             <div className='flex-1 flex items-center bg-gradient-to-r from-indigo-800/50 to-purple-800/50 px-4 py-2 rounded-full border-2 border-pink-400 shadow-lg backdrop-blur-sm'>
-                <input onChange={(e)=> {setInput(e.target.value); handleTyping();}} onKeyUp={(e)=> { if (e.key !== "Enter") handleTyping(); }} onBlur={() => { console.log("onBlur called, clearing timeout and stopping typing"); if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); } stopTyping(); }} value={input} onKeyDown={(e)=> { if (e.key === "Enter") { handleSendMessage(e); e.preventDefault(); }}} type="text" placeholder="Send a message..."
+                <input onChange={(e)=> {setInput(e.target.value); handleTyping();}} onKeyUp={(e)=> { if (e.key !== "Enter") handleTyping(); }} onBlur={() => { console.log("onBlur called, clearing timeout and stopping typing"); if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); } stopTyping(); }} value={input} onKeyDown={(e)=> { console.log("onKeyDown event:", e.key); if (e.key === "Enter") { handleSendMessage(e); e.preventDefault(); }}} type="text" placeholder="Send a message..."
                 className='flex-1 text-sm p-2 border-none outline-none text-white placeholder-gray-400 bg-transparent focus:ring-2 focus:ring-blue-500 rounded-md transition-all'/>
                 <input onChange={handleSendImage} type="file" id='image' accept='image/png, image/jpeg' hidden/>
                 <label htmlFor="image">
