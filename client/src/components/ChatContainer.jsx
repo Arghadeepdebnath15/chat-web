@@ -9,7 +9,7 @@ import './TypingIndicator.css'
 
 const ChatContainer = () => {
 
-    const { messages, users, selectedUser, setSelectedUser, sendMessage,
+    const { messages, users, selectedUser, setSelectedUser, sendMessage, deleteMessage, deleteAllMessages,
         getMessages, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages, incomingCall, setIncomingCall } = useContext(ChatContext)
 
     const { authUser, onlineUsers } = useContext(AuthContext)
@@ -176,32 +176,32 @@ const ChatContainer = () => {
       </div>
       {/* ------- chat area ------- */}
       <div className='flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6 bg-gradient-to-b from-transparent to-gray-900/20 scroll-smooth touch-auto -webkit-overflow-scrolling-touch'>
-        {loadingMessages ? (
-          <div className='flex items-center justify-center h-full'>
-            <div className='text-white text-center'>
-              <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2'></div>
-              <p>Loading messages...</p>
+          {loadingMessages ? (
+            <div className='flex items-center justify-center h-full'>
+              <div className='text-white text-center'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2'></div>
+                <p>Loading messages...</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          messages.filter(msg => (String(msg.senderId) === String(selectedUser._id) && String(msg.receiverId) === String(authUser._id)) || (String(msg.receiverId) === String(selectedUser._id) && String(msg.senderId) === String(authUser._id))).map((msg, index)=>(
-            <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
-                {msg.image ? (
-                    <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
-                ):(
+          ) : (
+            messages.filter(msg => (String(msg.senderId) === String(selectedUser._id) && String(msg.receiverId) === String(authUser._id)) || (String(msg.receiverId) === String(selectedUser._id) && String(msg.senderId) === String(authUser._id))).map((msg, index)=>(
+              <div key={index} onDoubleClick={(e) => { e.stopPropagation(); deleteMessage(msg._id); }} className={`flex items-end gap-2 justify-end animate-fade-in ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
+                  {msg.image ? (
+                      <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
+                  ):(
 
-                    <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${authUser && msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
-                )}
-                <div className="text-center text-xs">
-                    <img src={authUser && msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 h-7 rounded-full shadow-md object-cover' />
-                    <p className='text-gray-400 mt-1'>{formatMessageTime(msg.createdAt)}</p>
-                    {authUser && msg.senderId === authUser._id && msg.seen && (
-                        <p className='text-blue-400 text-xs mt-1 font-medium'>Seen</p>
-                    )}
-                </div>
-            </div>
-          ))
-        )}
+                      <p className={`p-3 max-w-[250px] md:text-sm font-light rounded-lg mb-8 break-all text-white shadow-lg hover:shadow-xl transition-all duration-200 ${authUser && msg.senderId === authUser._id ? 'bg-gradient-to-r from-cyan-400 to-blue-500 rounded-br-none' : 'bg-gradient-to-r from-emerald-400 to-green-500 rounded-bl-none'}`}>{msg.text}</p>
+                  )}
+                  <div className="text-center text-xs">
+                      <img src={authUser && msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 h-7 rounded-full shadow-md object-cover' />
+                      <p className='text-gray-400 mt-1'>{formatMessageTime(msg.createdAt)}</p>
+                      {authUser && msg.senderId === authUser._id && msg.seen && (
+                          <p className='text-blue-400 text-xs mt-1 font-medium'>Seen</p>
+                      )}
+                  </div>
+              </div>
+            ))
+          )}
         <div ref={scrollEnd}></div>
       </div>
 
@@ -209,7 +209,7 @@ const ChatContainer = () => {
     <div className='absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/50 to-transparent transition-all duration-500 ease-out'>
         <div className='flex items-center gap-2'>
             <div className='flex-1 flex items-center bg-gradient-to-r from-indigo-800/50 to-purple-800/50 px-4 py-2 rounded-full border-2 border-pink-400 shadow-lg backdrop-blur-sm'>
-                <input onChange={(e)=> {setInput(e.target.value); handleTyping();}} onKeyUp={(e)=> { if (e.key !== "Enter") handleTyping(); }} onBlur={() => { console.log("onBlur called, clearing timeout and stopping typing"); if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); } stopTyping(); }} value={input} onKeyDown={(e)=> { console.log("onKeyDown event:", e.key); if (e.key === "Enter" || e.key === "Shift") { handleSendMessage(e); e.preventDefault(); }}} type="text" placeholder="Send a message..."
+                <input onChange={(e)=> {setInput(e.target.value); handleTyping();}} onKeyUp={(e)=> { if (e.key === "Enter" && !e.shiftKey) { handleSendMessage(e); e.preventDefault(); } else if (e.key !== "Enter") { handleTyping(); } }} onBlur={() => { console.log("onBlur called, clearing timeout and stopping typing"); if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); } stopTyping(); }} value={input} type="text" placeholder="Send a message..."
                 className='flex-1 text-sm p-2 border-none outline-none text-white placeholder-gray-400 bg-transparent focus:ring-2 focus:ring-blue-500 rounded-md transition-all'/>
                 <input onChange={handleSendImage} type="file" id='image' accept='image/png, image/jpeg' hidden/>
                 <label htmlFor="image">

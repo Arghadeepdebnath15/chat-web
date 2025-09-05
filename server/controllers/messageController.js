@@ -149,3 +149,70 @@ export const sendMessage = async (req, res) =>{
         res.json({success: false, message: error.message})
     }
 }
+
+// Delete a single message
+export const deleteMessage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user._id;
+
+        const message = await Message.findById(id);
+        if (!message) {
+            return res.json({ success: false, message: "Message not found" });
+        }
+
+        // Allow deletion if the user is either the sender or receiver of the message
+        if (String(message.senderId) !== String(userId) && String(message.receiverId) !== String(userId)) {
+            return res.json({ success: false, message: "You can only delete messages in your conversations" });
+        }
+
+        await Message.findByIdAndDelete(id);
+
+        // Emit delete event to both sender and receiver
+        const receiverSocketId = userSocketMap[message.receiverId];
+        const senderSocketId = userSocketMap[message.senderId];
+
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("messageDeleted", id);
+        }
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messageDeleted", id);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Delete all messages between current user and selected user
+export const deleteAllMessages = async (req, res) => {
+    try {
+        const { id: selectedUserId } = req.params;
+        const userId = req.user._id;
+
+        const result = await Message.deleteMany({
+            $or: [
+                { senderId: userId, receiverId: selectedUserId },
+                { senderId: selectedUserId, receiverId: userId }
+            ]
+        });
+
+        // Emit delete all event to both users
+        const selectedUserSocketId = userSocketMap[selectedUserId];
+        const currentUserSocketId = userSocketMap[userId];
+
+        if (selectedUserSocketId) {
+            io.to(selectedUserSocketId).emit("allMessagesDeleted", { userId });
+        }
+        if (currentUserSocketId) {
+            io.to(currentUserSocketId).emit("allMessagesDeleted", { userId: selectedUserId });
+        }
+
+        res.json({ success: true, deletedCount: result.deletedCount });
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
+    }
+}

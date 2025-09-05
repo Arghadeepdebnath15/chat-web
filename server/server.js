@@ -14,7 +14,7 @@ const server = http.createServer(app)
 // Middleware setup
 app.use(express.json({limit: "4mb"}));
 app.use(cors({
-    origin: ["https://michats.netlify.app", "http://localhost:5173"],
+    origin: ["https://michats.netlify.app", "http://localhost:5173", "http://localhost:5174"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "token"]
@@ -24,7 +24,7 @@ app.use(cors({
 
 // Initialize socket.io server
 export const io = new Server(server, {
-    cors: {origin: ["https://michats.netlify.app", "http://localhost:5173"]}
+    cors: {origin: ["https://michats.netlify.app", "http://localhost:5173", "http://localhost:5174"]}
 })
 
 // Store online users
@@ -113,6 +113,21 @@ io.on("connection",(socket)=>{
         const toSocketId = userSocketMap[data.to];
         if (toSocketId) {
             socket.to(toSocketId).emit("webrtc-call-decline");
+        }
+    });
+
+    // Message delete events
+    socket.on("deleteMessage", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("messageDeleted", data.messageId);
+        }
+    });
+
+    socket.on("deleteAllMessages", (data) => {
+        const toSocketId = userSocketMap[data.to];
+        if (toSocketId) {
+            socket.to(toSocketId).emit("allMessagesDeleted", { userId: data.from });
         }
     });
 

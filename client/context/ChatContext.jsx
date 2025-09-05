@@ -93,6 +93,66 @@ export const ChatProvider = ({ children })=>{
         }
     }
 
+    // function to delete a single message
+    const deleteMessage = async (messageId) => {
+        try {
+            const { data } = await axios.delete(`/api/messages/${messageId}`);
+            if (data.success) {
+                setMessages((prevMessages) => prevMessages.filter(msg => msg._id !== messageId));
+                // Emit socket event to notify other user
+                if (socket && selectedUser) {
+                    socket.emit("deleteMessage", { to: selectedUser._id, messageId });
+                }
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
+
+    // function to delete all messages in the chat
+    const deleteAllMessages = async () => {
+        try {
+            const { data } = await axios.delete(`/api/messages/all/${selectedUser._id}`);
+            if (data.success) {
+                setMessages([]);
+                // Emit socket event to notify other user
+                if (socket && selectedUser && authUser) {
+                    socket.emit("deleteAllMessages", { to: selectedUser._id, from: authUser._id });
+                }
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
+
+    // Listen for messageDeleted event from socket
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleMessageDeleted = (messageId) => {
+            setMessages((prevMessages) => prevMessages.filter(msg => msg._id !== messageId));
+        };
+
+        const handleAllMessagesDeleted = ({ userId }) => {
+            // If the other user deleted all messages, clear messages if selectedUser matches
+            if (selectedUser && selectedUser._id === userId) {
+                setMessages([]);
+            }
+        };
+
+        socket.on("messageDeleted", handleMessageDeleted);
+        socket.on("allMessagesDeleted", handleAllMessagesDeleted);
+
+        return () => {
+            socket.off("messageDeleted", handleMessageDeleted);
+            socket.off("allMessagesDeleted", handleAllMessagesDeleted);
+        };
+    }, [socket, selectedUser]);
+
     // function to subscribe to messages for selected user
     const subscribeToMessages = async () =>{
         if(!socket) return;
@@ -243,7 +303,7 @@ export const ChatProvider = ({ children })=>{
     }
 
     const value = {
-        messages, users, selectedUser, getUsers, searchUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages,
+        messages, users, selectedUser, getUsers, searchUsers, getMessages, sendMessage, deleteMessage, deleteAllMessages, setSelectedUser, unseenMessages, setUnseenMessages,
         showRightSidebar, setShowRightSidebar, toggleRightSidebar, typingUsers, sendTyping, stopTyping, loadingMessages,
         socket, incomingCall, setIncomingCall
     }

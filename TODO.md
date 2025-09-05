@@ -1,14 +1,9 @@
-# TODO: Fix Seen Indicator to Show Only When Message is Actually Seen
-
-## Tasks
-- [x] Remove automatic marking in `getMessages` controller (server/controllers/messageController.js)
-- [x] Add IntersectionObserver in ChatContainer to detect visible messages (client/src/components/ChatContainer.jsx)
-- [x] Update socket newMessage handler to not auto-set seen (client/context/ChatContext.jsx)
-- [x] Test the functionality
-- [x] Fix send button clickability issue and message duplication
-
-## Details
-- Remove updateMany in getMessages that marks all messages as seen on chat open
-- Use IntersectionObserver to mark messages as seen when they enter viewport
-- Modify frontend to call markMessageAsSeen API when message is visible
-- Ensure seen indicator only shows for messages that have been viewed
+- [x] Add deleteMessage function in server/controllers/messageController.js
+- [x] Add deleteAllMessages function in server/controllers/messageController.js
+- [x] Add delete routes in server/routes/messageRoutes.js
+- [x] Add deleteMessage function in client/context/ChatContext.jsx
+- [x] Add deleteAllMessages function in client/context/ChatContext.jsx
+- [x] Add socket listeners for delete events in ChatContext.jsx
+- [x] Add onDoubleClick to message in ChatContainer.jsx
+- [x] Add onDoubleClick to chat area in ChatContainer.jsx
+- [x] Test the delete functionality
