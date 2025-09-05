@@ -105,8 +105,8 @@ export const ChatProvider = ({ children })=>{
             console.log("Comparing senderId and selectedUser._id:", newMessage.senderId, selectedUser?._id);
             if(selectedUser && String(newMessage.senderId) === String(selectedUser._id)){
                 console.log("Updating messages for selected user");
-                newMessage.seen = true;
-                setMessages((prevMessages)=> [...prevMessages, newMessage]);
+                const clonedMessage = {...newMessage, seen: true};
+                setMessages((prevMessages)=> [...prevMessages, clonedMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
             }else{
                 console.log("Message not from selected user, updating unseen messages");
@@ -117,7 +117,7 @@ export const ChatProvider = ({ children })=>{
                 setUsers((prevUsers) => {
                     const userExists = prevUsers.some(user => String(user._id) === String(newMessage.senderId));
                     if (!userExists) {
-                        const newUser = newMessage.sender || {
+                        const newUser = newMessage.sender ? {...newMessage.sender} : {
                             _id: newMessage.senderId,
                             fullName: newMessage.senderName || "Unknown",
                             avatar: newMessage.senderAvatar || null
