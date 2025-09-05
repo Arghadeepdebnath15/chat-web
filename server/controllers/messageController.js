@@ -152,6 +152,22 @@ export const sendMessage = async (req, res) =>{
             });
         }
 
+        // Also emit to sender's socket to add recipient to their chat list
+        const senderSocketId = userSocketMap[senderId];
+        if (senderSocketId && senderSocketId !== receiverSocketId) {
+            // Fetch receiver's user data
+            const receiverUser = await User.findById(receiverId).select("fullName profilePic");
+
+            io.to(senderSocketId).emit("newChatUser", {
+                user: {
+                    _id: receiverId,
+                    fullName: receiverUser?.fullName || "Unknown",
+                    profilePic: receiverUser?.profilePic || null
+                },
+                message: messageWithSender
+            });
+        }
+
         res.json({success: true, newMessage});
 
     } catch (error) {
