@@ -129,6 +129,19 @@ export const ChatProvider = ({ children })=>{
                     msg._id === messageId ? { ...msg, seen: true } : msg
                 )
             );
+            // Also update unseenMessages count for sender
+            setUnseenMessages((prevUnseen) => {
+                const newUnseen = { ...prevUnseen };
+                // Find message senderId from messages
+                const msg = prevMessages.find(m => m._id === messageId);
+                if (msg && newUnseen[msg.senderId]) {
+                    newUnseen[msg.senderId] = Math.max(0, newUnseen[msg.senderId] - 1);
+                    if (newUnseen[msg.senderId] === 0) {
+                        delete newUnseen[msg.senderId];
+                    }
+                }
+                return newUnseen;
+            });
         });
 
         // Listen for messagesSeen event to update multiple messages seen status
@@ -138,6 +151,20 @@ export const ChatProvider = ({ children })=>{
                     messageIds.includes(msg._id) ? { ...msg, seen: true } : msg
                 )
             );
+            // Also update unseenMessages count for senders
+            setUnseenMessages((prevUnseen) => {
+                const newUnseen = { ...prevUnseen };
+                messageIds.forEach((messageId) => {
+                    const msg = prevMessages.find(m => m._id === messageId);
+                    if (msg && newUnseen[msg.senderId]) {
+                        newUnseen[msg.senderId] = Math.max(0, newUnseen[msg.senderId] - 1);
+                        if (newUnseen[msg.senderId] === 0) {
+                            delete newUnseen[msg.senderId];
+                        }
+                    }
+                });
+                return newUnseen;
+            });
         });
 
         // Typing indicator events
