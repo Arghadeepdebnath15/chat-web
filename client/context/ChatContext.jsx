@@ -97,6 +97,8 @@ export const ChatProvider = ({ children })=>{
     const subscribeToMessages = async () =>{
         if(!socket) return;
 
+        console.log("Subscribing to socket events");
+        socket.off("newMessage");
         socket.on("newMessage", (newMessage)=>{
             console.log("Received newMessage event:", newMessage);
             console.log("Selected user:", selectedUser);
