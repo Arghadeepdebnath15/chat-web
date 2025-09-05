@@ -184,7 +184,7 @@ const ChatContainer = () => {
             </div>
           </div>
         ) : (
-          messages.map((msg, index)=>(
+          messages.filter(msg => (String(msg.senderId) === String(selectedUser._id) && String(msg.receiverId) === String(authUser._id)) || (String(msg.receiverId) === String(selectedUser._id) && String(msg.senderId) === String(authUser._id))).map((msg, index)=>(
             <div key={index} className={`flex items-end gap-2 justify-end animate-fade-in ${authUser && msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
                 {msg.image ? (
                     <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8 shadow-lg hover:shadow-xl transition-shadow'/>
