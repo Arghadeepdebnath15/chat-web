@@ -173,12 +173,24 @@ export const ChatProvider = ({ children })=>{
                 setUnseenMessages((prevUnseenMessages)=>( {
                     ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
                 }));
-                // Do NOT add unknown user to users list
-                // Instead, just update messages state to include the new message
-                setMessages((prevMessages) => {
-                    const clonedMessage = {...newMessage, seen: false};
-                    return [...prevMessages, clonedMessage];
-                });
+            // Add unknown user to users list when receiving a new message from a user not in the list
+            setUsers((prevUsers) => {
+                const userExists = prevUsers.some(user => user._id === newMessage.senderId);
+                if (!userExists) {
+                    // Fetch user details from server or create a minimal user object
+                    const newUser = {
+                        _id: newMessage.senderId,
+                        fullName: newMessage.senderName || "Unknown",
+                        profilePic: newMessage.senderAvatar || null
+                    };
+                    return [...prevUsers, newUser];
+                }
+                return prevUsers;
+            });
+            setMessages((prevMessages) => {
+                const clonedMessage = {...newMessage, seen: false};
+                return [...prevMessages, clonedMessage];
+            });
             }
         })
 
@@ -255,6 +267,23 @@ export const ChatProvider = ({ children })=>{
 
         socket.on("webrtc-call-decline", () => {
             // Handle call declined by remote user if needed
+        });
+
+        // Listen for newChatUser event to add new users to the sidebar
+        socket.on("newChatUser", ({ user, message }) => {
+            console.log("Received newChatUser event:", user, message);
+            setUsers((prevUsers) => {
+                const userExists = prevUsers.some(u => u._id === user._id);
+                if (!userExists) {
+                    return [...prevUsers, user];
+                }
+                return prevUsers;
+            });
+            // Also update unseen messages count
+            setUnseenMessages((prevUnseenMessages) => ({
+                ...prevUnseenMessages,
+                [message.senderId]: (prevUnseenMessages[message.senderId] || 0) + 1
+            }));
         });
     }
 
