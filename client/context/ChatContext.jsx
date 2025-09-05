@@ -102,7 +102,8 @@ export const ChatProvider = ({ children })=>{
         socket.on("newMessage", (newMessage)=>{
             console.log("Received newMessage event:", newMessage);
             console.log("Selected user:", selectedUser);
-            if(selectedUser && newMessage.senderId === selectedUser._id){
+            console.log("Comparing senderId and selectedUser._id:", newMessage.senderId, selectedUser?._id);
+            if(selectedUser && String(newMessage.senderId) === String(selectedUser._id)){
                 console.log("Updating messages for selected user");
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
@@ -111,7 +112,20 @@ export const ChatProvider = ({ children })=>{
                 console.log("Message not from selected user, updating unseen messages");
                 setUnseenMessages((prevUnseenMessages)=>( {
                     ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
-                }))
+                }));
+                // Add new user to users list if not already present
+                setUsers((prevUsers) => {
+                    const userExists = prevUsers.some(user => String(user._id) === String(newMessage.senderId));
+                    if (!userExists) {
+                        const newUser = newMessage.sender || {
+                            _id: newMessage.senderId,
+                            fullName: newMessage.senderName || "Unknown",
+                            avatar: newMessage.senderAvatar || null
+                        };
+                        return [...prevUsers, newUser];
+                    }
+                    return prevUsers;
+                });
             }
         })
 
